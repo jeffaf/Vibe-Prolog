@@ -36,5 +36,5 @@ jobs:
 
       - name: Run additional builtins tests
         run: |
-          uv run pytest tests/ttest_additional_builtins.py -v
+          uv run pytest tests/test_additional_builtins.py -v
 
