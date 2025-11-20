@@ -266,6 +266,13 @@ class PrologEngine:
                 return iter([result])
             return iter([])
 
+        # float/1 - Type check for float
+        if functor == "float" and len(args) == 1:
+            result = self._builtin_float(args[0], subst)
+            if result is not None:
+                return iter([result])
+            return iter([])
+
         # functor/3 - Extract/construct functor
         if functor == "functor" and len(args) == 3:
             return self._builtin_functor(args[0], args[1], args[2], subst)
@@ -952,6 +959,13 @@ class PrologEngine:
         """Built-in integer/1 predicate - succeeds if term is an integer."""
         term = deref(term, subst)
         if isinstance(term, Number) and isinstance(term.value, int):
+            return subst
+        return None
+
+    def _builtin_float(self, term: any, subst: Substitution) -> Substitution | None:
+        """Built-in float/1 predicate - succeeds if term is a float."""
+        term = deref(term, subst)
+        if isinstance(term, Number) and isinstance(term.value, float):
             return subst
         return None
 

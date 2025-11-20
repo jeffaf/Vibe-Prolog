@@ -33,7 +33,7 @@
 - ✅ `atom/1` – Test for atom
 - ✅ `number/1` – Test for number (integer or float)
 - ✅ `integer/1` – Test for integer
-- ❌ `float/1` – Test for float
+- ✅ `float/1` – Test for float
 - ❌ `atomic/1` – Test for atomic term (atom or number)
 - ✅ `compound/1` – Test for compound term
 - ❌ `callable/1` – Test for callable term
