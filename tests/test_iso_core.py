@@ -193,6 +193,30 @@ class TestISONumber:
         assert not prolog.has_solution("number(f(1))")
 
 
+class TestISOFloat:
+    """ISO 8.3.3 - Type testing: float/1
+
+    Conformity mapping: N/A - float/1 predicate not tested in iso-conformity-tests.pl
+    """
+
+    def test_float_floats(self):
+        # Conformity: N/A
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("float(1.5)")
+        assert prolog.has_solution("float(3.14159)")
+        assert prolog.has_solution("float(-2.5)")
+        assert prolog.has_solution("float(0.0)")
+
+    def test_float_non_floats(self):
+        # Conformity: N/A
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("float(X)")
+        assert not prolog.has_solution("float(a)")
+        assert not prolog.has_solution("float(1)")
+        assert not prolog.has_solution("float(f(1.5))")
+        assert not prolog.has_solution("float([1.5])")
+
+
 class TestISOFunctor:
     """ISO 8.5.1 - Term comparison: functor/3
 
