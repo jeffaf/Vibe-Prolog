@@ -340,9 +340,23 @@ class PrologEngine:
                 return iter([result])
             return iter([])
 
-        # assert/1 - Add clause to database
+        # asserta/1 - Add clause at beginning
+        if functor == "asserta" and len(args) == 1:
+            result = self._builtin_assert(args[0], subst, position="front")
+            if result is not None:
+                return iter([result])
+            return iter([])
+
+        # assertz/1 - Add clause at end
+        if functor == "assertz" and len(args) == 1:
+            result = self._builtin_assert(args[0], subst, position="back")
+            if result is not None:
+                return iter([result])
+            return iter([])
+
+        # assert/1 - Add clause to database (equivalent to assertz/1)
         if functor == "assert" and len(args) == 1:
-            result = self._builtin_assert(args[0], subst)
+            result = self._builtin_assert(args[0], subst, position="back")
             if result is not None:
                 return iter([result])
             return iter([])
@@ -1248,8 +1262,8 @@ class PrologEngine:
         result_list = List(tuple(sorted_solutions), None)
         return unify(result, result_list, subst)
 
-    def _builtin_assert(self, clause_term: any, subst: Substitution) -> Substitution | None:
-        """Built-in assert/1 predicate - Add a clause to the database."""
+    def _builtin_assert(self, clause_term: any, subst: Substitution, position: str = "back") -> Substitution | None:
+        """Built-in assert predicates - Add a clause to the database."""
         clause_term = deref(clause_term, subst)
         clause_term = apply_substitution(clause_term, subst)
 
@@ -1265,8 +1279,11 @@ class PrologEngine:
             # It's a fact
             new_clause = Clause(clause_term, None)
 
-        # Add to the clause database
-        self.clauses.append(new_clause)
+        # Add to the clause database at the specified position
+        if position == "front":
+            self.clauses.insert(0, new_clause)
+        else:
+            self.clauses.append(new_clause)
 
         return subst
 
@@ -1586,7 +1603,7 @@ class PrologEngine:
             "atom", "number", "var", "nonvar",
             "functor", "arg",
             "findall", "bagof", "setof",
-            "assert", "retract",
+            "assert", "asserta", "assertz", "retract",
             "maplist",
             "predicate_property", "catch"
         }
