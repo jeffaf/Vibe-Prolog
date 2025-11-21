@@ -1,10 +1,15 @@
 """Prolog query engine with backtracking."""
 
-from typing import Callable, Iterator
+from typing import Callable, Iterator, TypeAlias
 from collections import OrderedDict
 from collections.abc import Iterator as IteratorABC
 from prolog.parser import Compound, Atom, Variable, Number, List, Clause, Cut
 from prolog.unification import Substitution, unify, deref, apply_substitution
+
+
+BuiltinResult: TypeAlias = Iterator[Substitution] | Substitution | None
+BuiltinHandler: TypeAlias = Callable[[tuple, Substitution], BuiltinResult]
+BuiltinRegistry: TypeAlias = dict[tuple[str, int], BuiltinHandler]
 
 
 class CutException(Exception):
@@ -109,11 +114,11 @@ class PrologEngine:
         result = handler(args, subst)
         return self._normalize_builtin_result(result)
 
-    def _build_builtin_registry(self) -> dict[tuple[str, int], Callable[[tuple, Substitution], Iterator[Substitution] | Substitution | None]]:
+    def _build_builtin_registry(self) -> BuiltinRegistry:
         """Create the functor/arity dispatch table for built-in predicates."""
-        registry: dict[tuple[str, int], Callable[[tuple, Substitution], Iterator[Substitution] | Substitution | None]] = {}
+        registry: BuiltinRegistry = {}
 
-        def register(functor: str, arity: int, handler: Callable[[tuple, Substitution], Iterator[Substitution] | Substitution | None]):
+        def register(functor: str, arity: int, handler: BuiltinHandler):
             registry[(functor, arity)] = handler
 
         register("=", 2, lambda args, subst: unify(args[0], args[1], subst))
@@ -177,7 +182,7 @@ class PrologEngine:
 
         return registry
 
-    def _normalize_builtin_result(self, result: Iterator[Substitution] | Substitution | None) -> Iterator[Substitution]:
+    def _normalize_builtin_result(self, result: BuiltinResult) -> Iterator[Substitution]:
         """Normalize built-in handler return values to an iterator of substitutions."""
         if result is None:
             return iter([])
