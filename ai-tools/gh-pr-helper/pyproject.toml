@@ -1,0 +1,7 @@
+[project]
+name = "gh-pr-helper"
+version = "0.1.0"
+description = "Fetch and format GitHub PR comments for AI coding agents"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
