@@ -132,9 +132,10 @@ class TestCurrentPredicate:
         assert p["/"] == ["test_var", 1]
 
     def test_format_arities(self):
-        """Test that format/2 and format/3 are both recognized."""
+        """Test that format/1, format/2 and format/3 are all recognized."""
         prolog = PrologInterpreter()
 
+        assert prolog.has_solution("current_predicate(format/1)")
         assert prolog.has_solution("current_predicate(format/2)")
         assert prolog.has_solution("current_predicate(format/3)")
 

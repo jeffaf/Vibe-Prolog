@@ -1657,13 +1657,11 @@ class PrologEngine:
             # Control flow
             (";", 2), ("->", 2), (",", 2), ("\\+", 1),
             # I/O
-            ("write", 1), ("writeln", 1), ("format", 2), ("format", 3),
+            ("write", 1), ("writeln", 1), ("format", 1), ("format", 2), ("format", 3),
             # Higher-order
             ("maplist", 2),
             # Reflection
-            ("predicate_property", 2), ("current_predicate", 1),
-            # Exception handling
-            ("catch", 3)
+            ("predicate_property", 2), ("current_predicate", 1), ("catch", 3)
         ]
 
         for name, arity in builtin_predicates:
