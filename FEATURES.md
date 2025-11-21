@@ -60,8 +60,9 @@
 - ✅ `setof/3` – Collect unique sorted solutions
 
 ### Database Modification (ISO 8.9)
-- ❌ `asserta/1` – Add clause at beginning
-- ❌ `assertz/1` – Add clause at end (assert/1 adds at end)
+- ✅ `asserta/1` – Add clause at beginning
+- ✅ `assertz/1` – Add clause at end
+- ✅ `assert/1` – Add clause at end (equivalent to assertz/1)
 - ✅ `retract/1` – Remove clause
 - ❌ `abolish/1` – Remove all clauses for predicate
 - ✅ `clause/2` – Retrieve clause definition
@@ -172,9 +173,8 @@
 4. **Operator Definition**: `op/3` for custom operators
 
 ### Significant Deviations
-1. **Assert Ordering**: `assert/1` adds at end, not beginning like `assertz/1`
-2. **Exception Handling**: Simplified `catch/3` without full ISO exception types
-3. **Character Code Syntax**: Some advanced character code forms not supported
+1. **Exception Handling**: Simplified `catch/3` without full ISO exception types
+2. **Character Code Syntax**: Some advanced character code forms not supported
 
 ### Parser Limitations
 1. **Hex Character Codes**: `0'\xHH\` syntax not fully supported
