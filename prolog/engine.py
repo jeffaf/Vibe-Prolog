@@ -1563,8 +1563,15 @@ class PrologEngine:
         goal, existential_vars = self._strip_existentials(goal, subst)
 
         template_vars = self._collect_vars(template, subst)
-        goal_vars = self._collect_vars(goal, subst)
-        free_vars = sorted(goal_vars - template_vars - existential_vars)
+        goal_vars_in_order = self._collect_vars_in_order(goal, subst)
+
+        seen: set[str] = set()
+        free_vars: list[str] = []
+        for var in goal_vars_in_order:
+            if var in seen or var in template_vars or var in existential_vars:
+                continue
+            seen.add(var)
+            free_vars.append(var)
 
         groups: OrderedDict[tuple, list] = OrderedDict()
         for solution_subst in self._solve_goals([goal], subst):
@@ -1601,6 +1608,34 @@ class PrologEngine:
         elif isinstance(term, list):
             for item in term:
                 vars_found |= self._collect_vars(item, subst)
+
+        return vars_found
+
+    def _collect_vars_in_order(self, term: any, subst: Substitution, seen: set[str] | None = None) -> list[str]:
+        """Collect variable names in first-seen order from a term."""
+        if seen is None:
+            seen = set()
+
+        term = deref(term, subst)
+
+        if isinstance(term, Variable):
+            if term.name not in seen:
+                seen.add(term.name)
+                return [term.name]
+            return []
+
+        vars_found: list[str] = []
+        if isinstance(term, Compound):
+            for arg in term.args:
+                vars_found.extend(self._collect_vars_in_order(arg, subst, seen))
+        elif isinstance(term, List):
+            for elem in term.elements:
+                vars_found.extend(self._collect_vars_in_order(elem, subst, seen))
+            if term.tail is not None:
+                vars_found.extend(self._collect_vars_in_order(term.tail, subst, seen))
+        elif isinstance(term, list):
+            for item in term:
+                vars_found.extend(self._collect_vars_in_order(item, subst, seen))
 
         return vars_found
 
