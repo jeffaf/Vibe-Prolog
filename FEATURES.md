@@ -98,6 +98,7 @@
 
 ### Higher-Order Operations (Common Extensions)
 - ✅ `maplist/2` – Apply goal to list elements
+  - Streams goal solutions per element to preserve backtracking semantics
 
 ## Directives (ISO 7.4)
 
@@ -153,6 +154,9 @@
 - ✅ Dynamic clause enumeration
 - ✅ Recursion handling
 - ✅ Cut operator semantics
+- ✅ If-then/else evaluates conditions lazily (only first success) to preserve backtracking
+- ✅ Term comparison uses Prolog ordering (variables < numbers < atoms < compounds/lists) for deterministic sort/setof results
+- ✅ List conversions honor active substitutions when traversing open list tails (e.g., append/sort/reverse)
 
 ## Data Types
 - ✅ Atoms

@@ -635,8 +635,8 @@ class PrologEngine:
         # If list1 is a concrete list, convert it to Python list, append, and unify
         if isinstance(list1, List) and not isinstance(list1, Variable) and isinstance(list2, List):
             # Convert both lists to Python lists
-            py_list1 = self._list_to_python(list1)
-            py_list2 = self._list_to_python(list2)
+            py_list1 = self._list_to_python(list1, subst)
+            py_list2 = self._list_to_python(list2, subst)
 
             # Concatenate
             concatenated = py_list1 + py_list2
@@ -705,15 +705,22 @@ class PrologEngine:
                 # Recursively solve append(T1, L2, T3)
                 yield from self._builtin_append(tail1_var, list2, tail3, subst1)
 
-    def _list_to_python(self, prolog_list: List) -> list:
-        """Convert a Prolog list to a Python list."""
+    def _list_to_python(self, prolog_list: List, subst: Substitution | None = None) -> list:
+        """Convert a Prolog list to a Python list using the active substitution."""
+        subst = subst or Substitution()
         result = []
-        for elem in prolog_list.elements:
-            result.append(elem)
-        if prolog_list.tail is not None:
-            tail = deref(prolog_list.tail, Substitution())
-            if isinstance(tail, List) and tail.elements:
-                result.extend(self._list_to_python(tail))
+        current = deref(prolog_list, subst)
+
+        while isinstance(current, List):
+            result.extend(apply_substitution(elem, subst) for elem in current.elements)
+
+            if current.tail is None:
+                break
+
+            current = deref(current.tail, subst)
+            if isinstance(current, Variable):
+                break
+
         return result
 
     def _python_to_list(self, py_list: list) -> List:
@@ -806,44 +813,26 @@ class PrologEngine:
         if not isinstance(lst, List):
             return
 
-        # Base case: empty list
-        if not lst.elements and lst.tail is None:
-            yield subst
-            return
+        elements = self._list_to_python(lst, subst)
 
-        # Process each element
-        current_subst = subst
-        elements_to_process = list(lst.elements)
+        def apply_goal(index: int, current_subst: Substitution) -> Iterator[Substitution]:
+            if index >= len(elements):
+                yield current_subst
+                return
 
-        # Handle tail if present
-        if lst.tail is not None:
-            tail = deref(lst.tail, current_subst)
-            if isinstance(tail, List):
-                elements_to_process.extend(tail.elements)
+            elem = elements[index]
 
-        # Apply goal to each element
-        for elem in elements_to_process:
-            # Create goal by adding element as argument
             if isinstance(goal_template, Atom):
-                # Simple predicate name, make it a compound with one arg
                 goal = Compound(goal_template.name, (elem,))
             elif isinstance(goal_template, Compound):
-                # Add element to existing arguments
                 goal = Compound(goal_template.functor, goal_template.args + (elem,))
             else:
                 return
 
-            # Execute the goal - it must succeed for all elements
-            solutions = list(self._solve_goals([goal], current_subst))
-            if not solutions:
-                # Goal failed for this element - maplist fails
-                return
+            for solution in self._solve_goals([goal], current_subst):
+                yield from apply_goal(index + 1, solution)
 
-            # Take first solution and continue
-            current_subst = solutions[0]
-
-        # All elements processed successfully
-        yield current_subst
+        yield from apply_goal(0, subst)
 
     def _term_to_string(self, term: any) -> str:
         """Convert a Prolog term to a string for printing."""
@@ -876,14 +865,11 @@ class PrologEngine:
             then_part = left.args[1]
             else_part = right
 
-            # Try to prove the condition
-            solutions = list(self._solve_goals([condition], subst))
-            if solutions:
-                # Condition succeeded - execute then part with first solution
-                yield from self._solve_goals([then_part], solutions[0])
-            else:
-                # Condition failed - execute else part
-                yield from self._solve_goals([else_part], subst)
+            for condition_subst in self._solve_goals([condition], subst):
+                yield from self._solve_goals([then_part], condition_subst)
+                return
+
+            yield from self._solve_goals([else_part], subst)
         else:
             # Normal disjunction - try left branch first
             yield from self._solve_goals([left], subst)
@@ -892,12 +878,11 @@ class PrologEngine:
 
     def _builtin_if_then(self, condition: any, then_part: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in ->/2 predicate for if-then."""
-        # Try to prove the condition
-        solutions = list(self._solve_goals([condition], subst))
-        if solutions:
+        for condition_subst in self._solve_goals([condition], subst):
             # Condition succeeded - execute then part with first solution
             # and commit to it (cut-like behavior)
-            yield from self._solve_goals([then_part], solutions[0])
+            yield from self._solve_goals([then_part], condition_subst)
+            return
 
     def _builtin_conjunction(self, left: any, right: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in ,/2 predicate for conjunction (and)."""
@@ -1497,7 +1482,7 @@ class PrologEngine:
         # Mode 1: first argument is bound, reverse it and unify with second
         if isinstance(lst, List):
             # Convert to Python list, reverse, and convert back
-            py_list = self._list_to_python(lst)
+            py_list = self._list_to_python(lst, subst)
             reversed_py = list(reversed(py_list))
             result = self._python_to_list(reversed_py)
 
@@ -1507,7 +1492,7 @@ class PrologEngine:
         # Mode 2: second argument is bound, reverse it and unify with first
         elif isinstance(reversed_lst, List):
             # Convert to Python list, reverse, and convert back
-            py_list = self._list_to_python(reversed_lst)
+            py_list = self._list_to_python(reversed_lst, subst)
             reversed_py = list(reversed(py_list))
             result = self._python_to_list(reversed_py)
 
@@ -1523,7 +1508,7 @@ class PrologEngine:
             return None
 
         # Convert to Python list
-        py_list = self._list_to_python(lst)
+        py_list = self._list_to_python(lst, subst)
 
         # Remove duplicates
         unique = []
@@ -1668,21 +1653,36 @@ class PrologEngine:
 
         return False
 
-    def _term_sort_key(self, term: any) -> tuple:
+    def _list_to_compound(self, lst: List, subst: Substitution) -> any:
+        """Convert a List structure into nested '.' compounds for ordering."""
+        tail_term = deref(lst.tail, subst) if lst.tail is not None else Atom("[]")
+
+        for elem in reversed(lst.elements):
+            tail_term = Compound(".", (elem, tail_term))
+
+        return tail_term
+
+    def _term_sort_key(self, term: any, subst: Substitution | None = None) -> tuple:
         """Generate a sort key for a term."""
-        # Order: Variable < Number < Atom < Compound
+        subst = subst or Substitution()
+        term = deref(term, subst)
+
+        # Order: Variable < Number < Atom (including []) < Compound/List
         if isinstance(term, Variable):
             return (0, term.name)
-        elif isinstance(term, Number):
+        if isinstance(term, Number):
             return (1, term.value)
-        elif isinstance(term, Atom):
+        if isinstance(term, Atom):
             return (2, term.name)
-        elif isinstance(term, Compound):
-            return (3, term.functor, len(term.args), tuple(self._term_sort_key(arg) for arg in term.args))
-        elif isinstance(term, List):
-            return (4, len(term.elements), tuple(self._term_sort_key(e) for e in term.elements))
-        else:
-            return (5, str(term))
+        if isinstance(term, List):
+            if not term.elements and term.tail is None:
+                return (2, "[]")
+            compound_form = self._list_to_compound(term, subst)
+            return self._term_sort_key(compound_form, subst)
+        if isinstance(term, Compound):
+            return (3, term.functor, len(term.args), tuple(self._term_sort_key(arg, subst) for arg in term.args))
+
+        return (5, str(term))
 
     def _flatten_body(self, body: list) -> list:
         """Flatten conjunction in clause body into a list of goals."""
