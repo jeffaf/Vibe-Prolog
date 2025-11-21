@@ -387,6 +387,10 @@ class PrologEngine:
                 return iter([result])
             return iter([])
 
+        # current_predicate/1 - Enumerate defined predicates
+        if functor == "current_predicate" and len(args) == 1:
+            return self._builtin_current_predicate(args[0], subst)
+
         # catch/3 - Exception handling
         if functor == "catch" and len(args) == 3:
             return self._builtin_catch(args[0], args[1], args[2], subst)
@@ -1605,7 +1609,7 @@ class PrologEngine:
             "findall", "bagof", "setof",
             "assert", "asserta", "assertz", "retract",
             "maplist",
-            "predicate_property", "catch"
+            "predicate_property", "current_predicate", "catch"
         }
 
         # Check if goal is a compound term with a built-in functor
@@ -1621,6 +1625,64 @@ class PrologEngine:
             return unify(property, builtin_atom, subst)
 
         return None
+
+    def _builtin_current_predicate(self, indicator: any, subst: Substitution) -> Iterator[Substitution]:
+        """Built-in current_predicate/1 - Enumerate defined predicates."""
+        indicator = deref(indicator, subst)
+
+        # Collect all unique predicate indicators
+        predicates = set()
+
+        # Add built-in predicates with their arities
+        builtin_predicates = [
+            # Control constructs
+            ("true", 0), ("fail", 0), ("!", 0), ("nl", 0),
+            # Unification and comparison
+            ("=", 2), ("\\=", 2), ("==", 2), ("\\==", 2), ("@<", 2), ("@=<", 2), ("@>", 2), ("@>=", 2),
+            # Arithmetic
+            ("is", 2), ("=:=", 2), ("=\=", 2), ("<", 2), (">", 2), ("=<", 2), (">=", 2),
+            # Type testing
+            ("var", 1), ("nonvar", 1), ("atom", 1), ("number", 1), ("integer", 1), ("float", 1),
+            ("atomic", 1), ("compound", 1), ("callable", 1), ("ground", 1),
+            # Term manipulation
+            ("functor", 3), ("arg", 3), ("=..", 2),
+            # List operations
+            ("member", 2), ("append", 3), ("length", 2), ("reverse", 2), ("sort", 2),
+            # All solutions
+            ("findall", 3), ("bagof", 3), ("setof", 3),
+            # Database modification
+            ("asserta", 1), ("assertz", 1), ("assert", 1), ("retract", 1), ("clause", 2),
+            # Meta-logical
+            ("call", 1), ("once", 1),
+            # Control flow
+            (";", 2), ("->", 2), (",", 2), ("\\+", 1),
+            # I/O
+            ("write", 1), ("writeln", 1), ("format", 1), ("format", 2), ("format", 3),
+            # Higher-order
+            ("maplist", 2),
+            # Reflection
+            ("predicate_property", 2), ("current_predicate", 1), ("catch", 3)
+        ]
+
+        for name, arity in builtin_predicates:
+            predicates.add((name, arity))
+
+        # Add user-defined predicates from clauses
+        for clause in self.clauses:
+            if isinstance(clause.head, Compound):
+                predicates.add((clause.head.functor, len(clause.head.args)))
+            elif isinstance(clause.head, Atom):
+                predicates.add((clause.head.name, 0))
+
+        # Sort for deterministic order
+        sorted_predicates = sorted(predicates)
+
+        # Try to unify each predicate indicator with the argument
+        for name, arity in sorted_predicates:
+            pred_indicator = Compound("/", (Atom(name), Number(arity)))
+            new_subst = unify(indicator, pred_indicator, subst)
+            if new_subst is not None:
+                yield new_subst
 
     def _builtin_catch(self, goal: any, error: any, recovery: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in catch/3 - Simple exception handling.
