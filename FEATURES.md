@@ -87,7 +87,7 @@
 
 ### Predicate Inspection (ISO 8.8)
 - ⚠️ `predicate_property/2` – Query predicate properties (limited to built-in detection)
-- ❌ `current_predicate/1` – Enumerate defined predicates
+- ✅ `current_predicate/1` – Enumerate defined predicates
 
 ### List Operations (Common Extensions)
 - ✅ `member/2` – List membership
