@@ -1515,7 +1515,7 @@ class PrologEngine:
 
         # List of all built-in functors
         builtins = {
-            "=", "\\=", "\\+", "is", "=:=", "<", ">", "=<", ">=", "==", "\\==", "@<", "@=<", "@>", "@>=", "=..",
+            "=", "\\=", "\\+", "is", "=:=", "=\=", "<", ">", "=<", ">=", "==", "\\==", "@<", "@=<", "@>", "@>=", "=..",
             "member", "append", "length", "reverse", "sort",
             "clause", "call", "once", "true", "fail", "!",
             "write", "writeln", "nl", "format",
