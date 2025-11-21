@@ -56,10 +56,10 @@ This project was developed using multiple AI coding tools working together:
 - **Claude Sonnet 4.5** - Core implementation and architecture
 
 ### Automation & Workflows
-- **[Kilocode](./ai-tools/kilocode/)** - Automated issue-to-PR workflow
+- **[Kilocode](./ai-tools/kilocode/README.md)** - Automated issue-to-PR workflow
   - `fix-issue-with-kilocode` - Takes GitHub issue, creates branch, implements fix, opens PR
   - `address-pr-comments-with-kilocode` - Automatically addresses PR review comments
-- **[gh-pr-helper](./ai-tools/gh-pr-helper/)** - Fetches and formats PR comments for AI consumption
+- **[gh-pr-helper](./ai-tools/gh-pr-helper/README.md)** - Fetches and formats PR comments for AI consumption
 
 ### Supporting Tools
 - **GitHub Copilot** - Code suggestions and completions (via Cursor)
