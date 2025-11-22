@@ -4,8 +4,8 @@ import Layout from '../layouts/Layout.astro';
 
 <Layout title="AI Tools - Vibe Prolog" description="AI coding tools and automation workflows used to build Vibe Prolog">
   <div class="hero">
-    <h1>AI Tools & Automation</h1>
-    <p class="subtitle">How multiple AI coding tools work together to build Vibe Prolog</p>
+    <h1>AI TOOLS & AUTOMATION</h1>
+    <p class="subtitle">HOW MULTIPLE AI CODING TOOLS WORK TOGETHER TO BUILD VIBE PROLOG</p>
   </div>
 
   <div class="content">
@@ -238,8 +238,8 @@ chmod +x gh-pr-helper
         Tool vendors: Want to add your AI coding tool to this project? We'd love to try it!
         Open a PR or issue on GitHub.
       </p>
-      <a href="https://github.com/nlothian/Vibe-Prolog" class="button primary" target="_blank" rel="noopener">
-        View on GitHub
+      <a href="https://github.com/nlothian/Vibe-Prolog" class="neon-button primary" target="_blank" rel="noopener">
+        VIEW ON GITHUB
       </a>
     </section>
   </div>
@@ -248,81 +248,112 @@ chmod +x gh-pr-helper
 <style>
   .hero {
     text-align: center;
-    padding: 3rem 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 3rem;
+    padding: var(--space-2xl) 0;
+    border-bottom: 2px solid rgba(255, 0, 128, 0.5);
+    margin-bottom: var(--space-2xl);
   }
 
   .hero h1 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
-    color: var(--primary);
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    margin-bottom: var(--space-md);
+    color: var(--color-electric-magenta);
+    letter-spacing: 0.1em;
+    text-shadow:
+      0 0 20px rgba(255, 0, 128, 0.6),
+      0 0 40px rgba(255, 0, 128, 0.4);
+    animation: neonPulse 2s infinite;
   }
 
   .subtitle {
     font-size: 1.2rem;
-    color: var(--text-light);
+    color: var(--color-cyber-blue);
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
   }
 
   .content {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 0 auto;
   }
 
   section {
-    margin-bottom: 3rem;
+    margin-bottom: var(--space-2xl);
   }
 
   h2 {
-    font-size: 2rem;
-    color: var(--primary);
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--border);
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    color: var(--color-cyber-blue);
+    margin-bottom: var(--space-md);
+    padding-bottom: var(--space-sm);
+    border-bottom: 2px solid rgba(0, 240, 255, 0.5);
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
   }
 
   h3 {
-    font-size: 1.5rem;
-    color: var(--text);
-    margin-bottom: 0.75rem;
-    margin-top: 1.5rem;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    color: var(--color-electric-magenta);
+    margin-bottom: var(--space-sm);
+    margin-top: var(--space-lg);
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 15px rgba(255, 0, 128, 0.4);
   }
 
   h4 {
-    font-size: 1.25rem;
-    color: var(--text);
-    margin-bottom: 0.5rem;
-    margin-top: 1rem;
+    font-size: 1.5rem;
+    color: var(--color-acid-green);
+    margin-bottom: var(--space-sm);
+    margin-top: var(--space-md);
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
+  }
+
+  p {
+    margin-bottom: var(--space-md);
+    line-height: 1.8;
+  }
+
+  ul, ol {
+    margin: var(--space-md) 0;
+    padding-left: var(--space-xl);
+  }
+
+  li {
+    margin-bottom: var(--space-sm);
+    line-height: 1.8;
   }
 
   .tool-card {
-    background-color: #f9fafb;
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    background-color: rgba(26, 26, 26, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 240, 255, 0.5);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-lg);
+    box-shadow: 0 0 40px rgba(0, 240, 255, 0.3);
+    transition: all var(--duration-normal) var(--easing-elastic);
+  }
+
+  .tool-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 0 60px rgba(0, 240, 255, 0.6);
+    border-color: rgba(0, 240, 255, 0.8);
   }
 
   .tool-card h3 {
     margin-top: 0;
-    color: var(--primary);
-  }
-
-  .tool-card ul, .tool-card ol {
-    margin-left: 1.5rem;
-    margin-bottom: 1rem;
-  }
-
-  .tool-card li {
-    margin-bottom: 0.5rem;
+    color: var(--color-electric-magenta);
   }
 
   .code-example {
-    background-color: var(--code-bg);
-    border-radius: 0.5rem;
-    padding: 1rem;
-    margin: 1rem 0;
+    background-color: rgba(26, 26, 26, 0.8);
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    padding: var(--space-md);
+    margin: var(--space-md) 0;
     overflow-x: auto;
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
   }
 
   .code-example pre {
@@ -332,31 +363,44 @@ chmod +x gh-pr-helper
   .code-example code {
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.9rem;
+    color: var(--color-acid-green);
   }
 
   .tool-requirements {
-    margin-top: 1rem;
-    padding: 0.75rem;
-    background-color: #fef3c7;
-    border-left: 3px solid #f59e0b;
-    border-radius: 0.25rem;
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    background-color: rgba(255, 255, 0, 0.1);
+    border-left: 3px solid var(--color-toxic-yellow);
     font-size: 0.9rem;
+    box-shadow: 0 0 10px rgba(255, 255, 0, 0.2);
+  }
+
+  .tool-requirements strong {
+    color: var(--color-toxic-yellow);
+    text-shadow: 0 0 10px rgba(255, 255, 0, 0.4);
   }
 
   .tool-list {
     display: grid;
-    gap: 1rem;
+    gap: var(--space-md);
   }
 
   .tool-item {
-    padding: 1rem;
-    border-left: 3px solid var(--primary);
-    background-color: #f9fafb;
+    padding: var(--space-md);
+    border-left: 3px solid var(--color-acid-green);
+    background-color: rgba(26, 26, 26, 0.4);
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.2);
+    transition: all var(--duration-fast);
+  }
+
+  .tool-item:hover {
+    background-color: rgba(26, 26, 26, 0.6);
+    box-shadow: 0 0 30px rgba(57, 255, 20, 0.4);
   }
 
   .tool-item h4 {
     margin-top: 0;
-    color: var(--primary);
+    color: var(--color-acid-green);
   }
 
   .tool-item p {
@@ -366,28 +410,31 @@ chmod +x gh-pr-helper
   .workflow {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-    margin-top: 1.5rem;
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
   }
 
   .workflow-step {
     display: flex;
-    gap: 1rem;
+    gap: var(--space-md);
     align-items: start;
   }
 
   .step-number {
     flex-shrink: 0;
-    width: 2.5rem;
-    height: 2.5rem;
-    background-color: var(--primary);
-    color: white;
-    border-radius: 50%;
+    width: 3rem;
+    height: 3rem;
+    background: transparent;
+    color: var(--color-electric-magenta);
+    border: 2px solid var(--color-electric-magenta);
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    font-size: 1.2rem;
+    font-size: 1.4rem;
+    box-shadow:
+      0 0 20px rgba(255, 0, 128, 0.4),
+      inset 0 0 20px rgba(255, 0, 128, 0.1);
   }
 
   .step-content {
@@ -396,54 +443,73 @@ chmod +x gh-pr-helper
 
   .step-content h4 {
     margin-top: 0;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-xs);
+    color: var(--color-cyber-blue);
   }
 
   .step-content p {
-    margin-top: 0.25rem;
-    color: var(--text-light);
+    margin-top: var(--space-xs);
+    color: rgba(0, 240, 255, 0.8);
+  }
+
+  .step-content code {
+    background-color: rgba(26, 26, 26, 0.8);
+    color: var(--color-acid-green);
+    padding: 0.2rem 0.6rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
   }
 
   .cta {
     text-align: center;
-    padding: 2rem;
-    background-color: #f9fafb;
-    border-radius: 0.5rem;
-    margin-top: 3rem;
+    padding: var(--space-xl);
+    background-color: rgba(26, 26, 26, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 0, 128, 0.5);
+    margin-top: var(--space-2xl);
+    box-shadow: 0 0 40px rgba(255, 0, 128, 0.3);
   }
 
   .cta h2 {
     border-bottom: none;
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-sm);
   }
 
   .cta p {
-    margin-bottom: 1.5rem;
+    margin-bottom: var(--space-lg);
   }
 
-  .button {
-    display: inline-block;
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.5rem;
+  .neon-button {
+    background: transparent;
+    border: 2px solid var(--color-electric-magenta);
+    color: var(--color-electric-magenta);
+    padding: 16px 40px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.08em;
     text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s;
+    display: inline-block;
+    box-shadow:
+      0 0 20px rgba(255, 0, 128, 0.4),
+      inset 0 0 20px rgba(255, 0, 128, 0.1);
+    transition: all var(--duration-normal) var(--easing-elastic);
   }
 
-  .button.primary {
-    background-color: var(--primary);
-    color: white;
-  }
-
-  .button.primary:hover {
-    background-color: var(--primary-dark);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+  .neon-button:hover {
+    background: var(--color-electric-magenta);
+    color: var(--color-void-black);
+    box-shadow:
+      0 0 60px rgba(255, 0, 128, 0.8),
+      0 0 100px rgba(255, 0, 128, 0.4);
+    transform: translateY(-4px);
   }
 
   @media (max-width: 768px) {
     .hero h1 {
-      font-size: 2rem;
+      font-size: clamp(2rem, 6vw, 3rem);
     }
 
     .subtitle {
@@ -451,17 +517,31 @@ chmod +x gh-pr-helper
     }
 
     h2 {
+      font-size: 2rem;
+    }
+
+    h3 {
       font-size: 1.5rem;
     }
 
     .workflow-step {
       flex-direction: column;
+      gap: var(--space-sm);
     }
 
     .step-number {
-      width: 2rem;
-      height: 2rem;
-      font-size: 1rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      font-size: 1.2rem;
+    }
+
+    .tool-card {
+      padding: var(--space-md);
+    }
+
+    .neon-button {
+      padding: 12px 30px;
+      font-size: 16px;
     }
   }
 </style>

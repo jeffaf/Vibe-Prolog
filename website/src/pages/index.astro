@@ -31,15 +31,17 @@ const htmlContent = marked.parse(readmeContent) as string;
 
 <Layout title="Vibe Prolog" description="A Prolog interpreter implementation in Python, built with AI">
   <div class="hero">
-    <h1>Vibe Prolog</h1>
-    <p class="tagline">A Prolog interpreter implementation in Python</p>
+    <div class="gradient-blob blob-1"></div>
+    <div class="gradient-blob blob-2"></div>
+    <h1>VIBE PROLOG</h1>
+    <p class="tagline">A PROLOG INTERPRETER IN PYTHON</p>
     <p class="subtitle">Built entirely with AI code generation</p>
     <div class="cta-buttons">
-      <a href="https://github.com/nlothian/Vibe-Prolog" class="button primary" target="_blank" rel="noopener">
-        View on GitHub
+      <a href="https://github.com/nlothian/Vibe-Prolog" class="neon-button primary" target="_blank" rel="noopener">
+        VIEW ON GITHUB
       </a>
-      <a href={`${import.meta.env.BASE_URL}/docs`} class="button secondary">
-        Read Documentation
+      <a href={`${import.meta.env.BASE_URL}/docs`} class="neon-button secondary">
+        READ DOCS
       </a>
     </div>
   </div>
@@ -49,143 +51,271 @@ const htmlContent = marked.parse(readmeContent) as string;
 
 <style>
   .hero {
+    min-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    padding: 3rem 0;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 3rem;
+    padding: var(--space-2xl) var(--space-lg);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: var(--space-2xl);
+  }
+
+  .gradient-blob {
+    position: absolute;
+    width: 600px;
+    height: 600px;
+    filter: blur(80px);
+    animation: float 6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .blob-1 {
+    background: radial-gradient(circle, rgba(255, 0, 128, 0.3) 0%, transparent 70%);
+    top: 20%;
+    left: 20%;
+  }
+
+  .blob-2 {
+    background: radial-gradient(circle, rgba(0, 240, 255, 0.25) 0%, transparent 70%);
+    bottom: 20%;
+    right: 20%;
+    animation-delay: -3s;
   }
 
   .hero h1 {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-    color: var(--primary);
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 10vw, 6rem);
+    color: var(--color-electric-magenta);
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-md);
+    text-shadow:
+      0 0 20px rgba(255, 0, 128, 0.6),
+      0 0 40px rgba(255, 0, 128, 0.4),
+      0 0 60px rgba(255, 0, 128, 0.2);
+    animation: neonPulse 2s infinite;
+    position: relative;
+    z-index: 1;
   }
 
   .tagline {
-    font-size: 1.5rem;
-    color: var(--text-light);
-    margin-bottom: 0.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    color: var(--color-cyber-blue);
+    letter-spacing: 0.08em;
+    margin-bottom: var(--space-sm);
+    text-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+    position: relative;
+    z-index: 1;
   }
 
   .subtitle {
     font-size: 1.1rem;
-    color: var(--text-light);
-    margin-bottom: 2rem;
+    color: var(--color-acid-green);
+    margin-bottom: var(--space-xl);
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+    position: relative;
+    z-index: 1;
   }
 
   .cta-buttons {
     display: flex;
-    gap: 1rem;
+    gap: var(--space-md);
     justify-content: center;
     flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
   }
 
-  .button {
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.5rem;
+  .neon-button {
+    background: transparent;
+    border: 2px solid var(--color-electric-magenta);
+    color: var(--color-electric-magenta);
+    padding: 16px 40px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.08em;
     text-decoration: none;
-    font-weight: 600;
-    transition: all 0.2s;
-    display: inline-block;
+    box-shadow:
+      0 0 20px rgba(255, 0, 128, 0.4),
+      inset 0 0 20px rgba(255, 0, 128, 0.1);
+    transition: all var(--duration-normal) var(--easing-elastic);
+    position: relative;
   }
 
-  .button.primary {
-    background-color: var(--primary);
-    color: white;
+  .neon-button:hover {
+    background: var(--color-electric-magenta);
+    color: var(--color-void-black);
+    box-shadow:
+      0 0 60px rgba(255, 0, 128, 0.8),
+      0 0 100px rgba(255, 0, 128, 0.4);
+    transform: translateY(-4px);
   }
 
-  .button.primary:hover {
-    background-color: var(--primary-dark);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+  .neon-button:active {
+    animation: strobe 0.1s;
   }
 
-  .button.secondary {
-    background-color: transparent;
-    color: var(--primary);
-    border: 2px solid var(--primary);
+  .neon-button.secondary {
+    border-color: var(--color-cyber-blue);
+    color: var(--color-cyber-blue);
+    box-shadow:
+      0 0 20px rgba(0, 240, 255, 0.4),
+      inset 0 0 20px rgba(0, 240, 255, 0.1);
   }
 
-  .button.secondary:hover {
-    background-color: var(--primary);
-    color: white;
-    transform: translateY(-2px);
+  .neon-button.secondary:hover {
+    background: var(--color-cyber-blue);
+    box-shadow:
+      0 0 60px rgba(0, 240, 255, 0.8),
+      0 0 100px rgba(0, 240, 255, 0.4);
   }
 
+  @keyframes strobe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Content Styles */
   .content {
-    max-width: 800px;
+    max-width: 900px;
     margin: 0 auto;
   }
 
   .content :global(h1) {
-    font-size: 2rem;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    color: var(--primary);
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-md);
+    color: var(--color-electric-magenta);
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 20px rgba(255, 0, 128, 0.4);
+    border-bottom: 2px solid rgba(255, 0, 128, 0.5);
+    padding-bottom: var(--space-sm);
   }
 
   .content :global(h2) {
-    font-size: 1.5rem;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 2rem;
+    margin-top: var(--space-lg);
+    margin-bottom: var(--space-md);
+    color: var(--color-cyber-blue);
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
   }
 
   .content :global(h3) {
-    font-size: 1.25rem;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    color: var(--text);
+    font-size: 1.5rem;
+    margin-top: var(--space-md);
+    margin-bottom: var(--space-sm);
+    color: var(--color-acid-green);
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
   }
 
   .content :global(p) {
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-md);
+    line-height: 1.8;
   }
 
   .content :global(code) {
-    background-color: var(--code-bg);
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.25rem;
+    background-color: rgba(26, 26, 26, 0.8);
+    color: var(--color-acid-green);
+    padding: 0.2rem 0.6rem;
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.9em;
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
   }
 
   .content :global(pre) {
-    background-color: var(--code-bg);
-    padding: 1rem;
-    border-radius: 0.5rem;
+    background-color: rgba(26, 26, 26, 0.8);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: var(--space-md);
     overflow-x: auto;
-    margin: 1rem 0;
+    margin: var(--space-md) 0;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
   }
 
   .content :global(pre code) {
     background-color: transparent;
     padding: 0;
+    border: none;
+    box-shadow: none;
   }
 
   .content :global(a) {
-    color: var(--primary);
+    color: var(--color-cyber-blue);
     text-decoration: none;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    transition: all var(--duration-fast);
   }
 
   .content :global(a:hover) {
-    text-decoration: underline;
+    color: var(--color-electric-magenta);
+    text-shadow: 0 0 15px rgba(255, 0, 128, 0.6);
+  }
+
+  .content :global(ul),
+  .content :global(ol) {
+    margin: var(--space-md) 0;
+    padding-left: var(--space-xl);
+  }
+
+  .content :global(li) {
+    margin-bottom: var(--space-sm);
   }
 
   .content :global(img) {
     max-width: 100%;
     height: auto;
-    border-radius: 0.5rem;
-    margin: 1rem 0;
+    margin: var(--space-md) 0;
+    border: 1px solid rgba(255, 0, 128, 0.3);
+    box-shadow: 0 0 30px rgba(255, 0, 128, 0.3);
+  }
+
+  .content :global(blockquote) {
+    border-left: 3px solid var(--color-electric-magenta);
+    padding-left: var(--space-md);
+    margin: var(--space-md) 0;
+    color: rgba(0, 240, 255, 0.8);
+    font-style: italic;
   }
 
   @media (max-width: 768px) {
+    .hero {
+      min-height: 60vh;
+      padding: var(--space-xl) var(--space-md);
+    }
+
+    .gradient-blob {
+      width: 400px;
+      height: 400px;
+    }
+
     .hero h1 {
-      font-size: 2rem;
+      font-size: clamp(2rem, 8vw, 3rem);
     }
 
     .tagline {
-      font-size: 1.2rem;
+      font-size: clamp(1rem, 3vw, 1.5rem);
+    }
+
+    .neon-button {
+      padding: 12px 30px;
+      font-size: 16px;
+    }
+
+    .content :global(h1) {
+      font-size: 2rem;
+    }
+
+    .content :global(h2) {
+      font-size: 1.5rem;
     }
   }
 </style>
