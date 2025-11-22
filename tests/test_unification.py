@@ -5,6 +5,8 @@ Tests complex unification scenarios.
 
 import pytest
 from prolog import PrologInterpreter
+from prolog.unification import vars
+from prolog.parser import Atom, Variable, Compound, List
 
 
 class TestBasicUnification:
@@ -518,25 +520,16 @@ class TestVarsFunction:
     """Tests for the vars() function in unification.py"""
 
     def test_vars_empty_term(self):
-        from prolog.unification import vars
-        from prolog.parser import Atom
-
         term = Atom('a')
         result = vars(term)
         assert result == set()
 
     def test_vars_single_variable(self):
-        from prolog.unification import vars
-        from prolog.parser import Variable
-
         var = Variable('X')
         result = vars(var)
         assert result == {var}
 
     def test_vars_compound_term(self):
-        from prolog.unification import vars
-        from prolog.parser import Variable, Compound, Atom
-
         var_x = Variable('X')
         var_y = Variable('Y')
         term = Compound('f', [var_x, Atom('a'), var_y])
@@ -544,9 +537,6 @@ class TestVarsFunction:
         assert result == {var_x, var_y}
 
     def test_vars_list(self):
-        from prolog.unification import vars
-        from prolog.parser import Variable, List, Atom
-
         var_x = Variable('X')
         var_y = Variable('Y')
         term = List([var_x, Atom('b'), var_y], None)
@@ -554,9 +544,6 @@ class TestVarsFunction:
         assert result == {var_x, var_y}
 
     def test_vars_nested_compound(self):
-        from prolog.unification import vars
-        from prolog.parser import Variable, Compound, Atom
-
         var_x = Variable('X')
         var_z = Variable('Z')
         inner = Compound('g', [var_x])
@@ -565,9 +552,6 @@ class TestVarsFunction:
         assert result == {var_x, var_z}
 
     def test_vars_with_tail(self):
-        from prolog.unification import vars
-        from prolog.parser import Variable, List, Atom
-
         var_x = Variable('X')
         var_y = Variable('Y')
         tail = List([var_y], None)
