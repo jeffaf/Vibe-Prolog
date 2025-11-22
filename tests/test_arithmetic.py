@@ -202,10 +202,30 @@ class TestArithmeticComparisons:
     def test_not_equal(self):
         prolog = PrologInterpreter()
 
+        # Basic integer inequality
         assert prolog.has_solution(r"5 =\= 3")
         assert prolog.has_solution(r"2 + 3 =\= 6")
+
+        # Equality should fail
         assert not prolog.has_solution(r"5 =\= 5")
         assert not prolog.has_solution(r"10 - 5 =\= 5")
+
+        # Float comparisons
+        assert prolog.has_solution(r"5.0 =\= 3.0")
+        assert not prolog.has_solution(r"5.0 =\= 5.0")
+
+        # Negative numbers
+        assert prolog.has_solution(r"-5 =\= 3")
+        assert prolog.has_solution(r"5 =\= -3")
+        assert not prolog.has_solution(r"-5 =\= -5")
+
+        # Complex expressions
+        assert prolog.has_solution(r"2 * 3 =\= 7")
+        assert not prolog.has_solution(r"2 * 3 =\= 6")
+
+        # Mixed int/float - same numeric value should be equal
+        assert not prolog.has_solution(r"5 =\= 5.0")  # Same value, should fail
+        assert prolog.has_solution(r"5 =\= 6.0")
 
 
 class TestArithmeticInRules:
