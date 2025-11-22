@@ -92,7 +92,7 @@ def get_git_changes(since_date: datetime | None) -> list[dict]:
 
         return commits
     except subprocess.CalledProcessError as e:
-        print(f"Error running git log: {e}")
+        print(f"Error running git log: {e}", file=sys.stderr)
         return []
 
 
