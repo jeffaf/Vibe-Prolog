@@ -195,8 +195,17 @@ class TestCutAndNegation:
         parser = PrologParser()
         clauses = parser.parse("test :- \\+ q, !, r.")
         body = clauses[0].body[0]
-        assert isinstance(body, Compound)
-        assert body.functor == ','
+        assert isinstance(body, Compound) and body.functor == ','
+
+        # The conjunction is right-associative, so it should parse as `','(\+ q, ','(!, r))`
+        left_conj, right_conj = body.args
+        assert isinstance(left_conj, Compound) and left_conj.functor == '\\+'
+        assert left_conj.args[0].name == 'q'
+
+        assert isinstance(right_conj, Compound) and right_conj.functor == ','
+        cut_op, r_atom = right_conj.args
+        assert isinstance(cut_op, Cut)
+        assert r_atom.name == 'r'
 
     def test_negation_in_parentheses(self):
         """Test negation in parentheses: p :- (\+ q ; r), !."""
