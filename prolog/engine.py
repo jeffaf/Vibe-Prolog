@@ -1110,10 +1110,9 @@ class PrologEngine:
         arity_term = deref(arity_term, subst)
 
         # Strict validation: name must be Atom, arity must be non-negative integer
-        if not isinstance(name_term, Atom) or not isinstance(arity_term, Number):
+        if not isinstance(name_term, Atom):
             return None
-
-        if not isinstance(arity_term.value, int) or arity_term.value < 0:
+        if not isinstance(arity_term, Number) or not isinstance(arity_term.value, int) or arity_term.value < 0:
             return None
         arity = arity_term.value
 
