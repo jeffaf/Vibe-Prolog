@@ -346,20 +346,23 @@ class PrologEngine:
                 if left is None or right is None:
                     return None
 
-                if expr.functor == "+":
-                    return left + right
-                elif expr.functor == "-":
-                    return left - right
-                elif expr.functor == "*":
-                    return left * right
-                elif expr.functor == "/":
-                    return left / right
-                elif expr.functor == "//":
-                    return left // right
-                elif expr.functor == "mod":
-                    return left % right
-                elif expr.functor == "**":
-                    return left ** right
+                try:
+                    if expr.functor == "+":
+                        return left + right
+                    elif expr.functor == "-":
+                        return left - right
+                    elif expr.functor == "*":
+                        return left * right
+                    elif expr.functor == "/":
+                        return left / right
+                    elif expr.functor == "//":
+                        return left // right
+                    elif expr.functor == "mod":
+                        return left % right
+                    elif expr.functor == "**":
+                        return left ** right
+                except ZeroDivisionError:
+                    return None
 
         return None
 
