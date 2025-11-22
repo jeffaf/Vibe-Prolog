@@ -84,9 +84,17 @@ def get_gh_pr_output(helper_path: Path, owner: str, repo: str, pr_number: str) -
     )
 
 
-def run_kilocode_with_pr_output(pr_output: str) -> None:
+def build_changes_to_make(pr_output: str) -> str:
+    prompt = (
+        "Read the PR comments below and generate precise instructions to address them. "
+        "Include the diff blocks and line numbers. Format as Markdown"
+    )
+    return run(["llm", "-s", prompt], input_text=pr_output)
+
+
+def run_kilocode_with_changes(changes_to_make: str) -> None:
     # Equivalent to: printf '%s\n' "$GH_PR_OUTPUT" | kilocode --auto
-    run(["kilocode", "--auto"], input_text=pr_output, capture_output=False)
+    run(["kilocode", "--auto"], input_text=changes_to_make, capture_output=False)
 
 
 def create_commit_from_pr_output(pr_output: str) -> None:
@@ -97,6 +105,7 @@ def create_commit_from_pr_output(pr_output: str) -> None:
     commit_message = run(
         [
             "llm",
+            "--extract"
             "-s",
             "give me a git commit message for changes that address these review comments",
         ],
@@ -136,7 +145,8 @@ def main(argv: list[str]) -> None:
     helper_path = ensure_gh_pr_helper(repo_root)
     pr_output = get_gh_pr_output(helper_path, owner, repo, pr_number)
 
-    run_kilocode_with_pr_output(pr_output)
+    changes_to_make = build_changes_to_make(pr_output)
+    run_kilocode_with_changes(changes_to_make)
     stage_changes()
     create_commit_from_pr_output(pr_output)
     push_current_branch()
