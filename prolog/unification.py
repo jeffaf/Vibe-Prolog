@@ -179,3 +179,20 @@ def apply_substitution(term: Any, subst: Substitution) -> Any:
         return List(new_elements, new_tail)
 
     return term
+
+def vars(term: Any) -> set[Variable]:
+    """Collect all variables in a term."""
+    def _walk(term: Any):
+        """Recursively walk the term and yield variables."""
+        if isinstance(term, Variable):
+            yield term
+        elif isinstance(term, Compound):
+            for arg in term.args:
+                yield from _walk(arg)
+        elif isinstance(term, List):
+            for elem in term.elements:
+                yield from _walk(elem)
+            if term.tail is not None:
+                yield from _walk(term.tail)
+
+    return set(_walk(term))
