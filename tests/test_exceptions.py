@@ -38,8 +38,7 @@ class TestThrowCatch:
         result = prolog.query_once("catch((throw(error(domain_error, foo))), E, true).")
         assert result is not None
         # E should unify with error(domain_error, foo)
-        assert isinstance(result['E'], dict) or hasattr(result['E'], 'functor')
-        # The exact structure depends on how the parser represents it
+        assert result['E'] == {'error': ['domain_error', 'foo']}
 
     def test_catch_with_cut_interaction(self):
         """Test that cut doesn't mask throws - throw bypasses cut."""
