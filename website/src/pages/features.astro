@@ -17,8 +17,8 @@ const htmlContent = marked.parse(featuresContent) as string;
 
 <Layout title="Features - Vibe Prolog" description="ISO Prolog feature coverage and implementation status">
   <div class="page-header">
-    <h1>Features</h1>
-    <p>ISO Prolog feature coverage and implementation status</p>
+    <h1>FEATURES</h1>
+    <p>ISO PROLOG FEATURE COVERAGE AND IMPLEMENTATION STATUS</p>
   </div>
 
   <div class="content" set:html={htmlContent} />
@@ -27,93 +27,181 @@ const htmlContent = marked.parse(featuresContent) as string;
 <style>
   .page-header {
     text-align: center;
-    padding: 2rem 0 3rem;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 2rem;
+    padding: var(--space-xl) 0 var(--space-2xl);
+    border-bottom: 2px solid rgba(255, 0, 128, 0.5);
+    margin-bottom: var(--space-xl);
   }
 
   .page-header h1 {
-    font-size: 2.5rem;
-    margin-bottom: 0.5rem;
-    color: var(--primary);
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    margin-bottom: var(--space-sm);
+    color: var(--color-electric-magenta);
+    letter-spacing: 0.1em;
+    text-shadow:
+      0 0 20px rgba(255, 0, 128, 0.6),
+      0 0 40px rgba(255, 0, 128, 0.4);
+    animation: neonPulse 2s infinite;
   }
 
   .page-header p {
     font-size: 1.2rem;
-    color: var(--text-light);
+    color: var(--color-cyber-blue);
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
   }
 
   .content {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 0 auto;
   }
 
   .content :global(h1) {
-    font-size: 2rem;
-    margin-top: 2.5rem;
-    margin-bottom: 1rem;
-    color: var(--text);
-    border-bottom: 2px solid var(--primary);
-    padding-bottom: 0.5rem;
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    margin-top: var(--space-2xl);
+    margin-bottom: var(--space-md);
+    color: var(--color-electric-magenta);
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 20px rgba(255, 0, 128, 0.4);
+    border-bottom: 2px solid rgba(255, 0, 128, 0.5);
+    padding-bottom: var(--space-sm);
   }
 
   .content :global(h2) {
-    font-size: 1.5rem;
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 2rem;
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-md);
+    color: var(--color-cyber-blue);
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
   }
 
   .content :global(h3) {
-    font-size: 1.25rem;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    color: var(--text);
+    font-size: 1.5rem;
+    margin-top: var(--space-lg);
+    margin-bottom: var(--space-sm);
+    color: var(--color-acid-green);
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
   }
 
   .content :global(h4) {
-    font-size: 1.1rem;
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-    color: var(--text);
+    font-size: 1.2rem;
+    margin-top: var(--space-md);
+    margin-bottom: var(--space-sm);
+    color: var(--color-cyber-blue);
   }
 
   .content :global(ul) {
-    margin: 1rem 0;
-    padding-left: 2rem;
+    margin: var(--space-md) 0;
+    padding-left: var(--space-xl);
   }
 
   .content :global(li) {
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--space-sm);
+    line-height: 1.8;
+  }
+
+  .content :global(p) {
+    margin-bottom: var(--space-md);
+    line-height: 1.8;
   }
 
   .content :global(code) {
-    background-color: var(--code-bg);
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.25rem;
+    background-color: rgba(26, 26, 26, 0.8);
+    color: var(--color-acid-green);
+    padding: 0.2rem 0.6rem;
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.9em;
+    border: 1px solid rgba(57, 255, 20, 0.3);
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
   }
 
   .content :global(pre) {
-    background-color: var(--code-bg);
-    padding: 1rem;
-    border-radius: 0.5rem;
+    background-color: rgba(26, 26, 26, 0.8);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: var(--space-md);
     overflow-x: auto;
-    margin: 1rem 0;
+    margin: var(--space-md) 0;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
   }
 
   .content :global(pre code) {
     background-color: transparent;
     padding: 0;
+    border: none;
+    box-shadow: none;
   }
 
   .content :global(a) {
-    color: var(--primary);
+    color: var(--color-cyber-blue);
     text-decoration: none;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    transition: all var(--duration-fast);
   }
 
   .content :global(a:hover) {
-    text-decoration: underline;
+    color: var(--color-electric-magenta);
+    text-shadow: 0 0 15px rgba(255, 0, 128, 0.6);
+  }
+
+  .content :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-md) 0;
+    background-color: rgba(26, 26, 26, 0.6);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+  }
+
+  .content :global(th),
+  .content :global(td) {
+    padding: var(--space-sm);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    text-align: left;
+  }
+
+  .content :global(th) {
+    background-color: rgba(26, 26, 26, 0.8);
+    color: var(--color-cyber-blue);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  }
+
+  .content :global(tr:hover) {
+    background-color: rgba(255, 0, 128, 0.1);
+  }
+
+  @media (max-width: 768px) {
+    .page-header {
+      padding: var(--space-lg) 0 var(--space-xl);
+    }
+
+    .page-header h1 {
+      font-size: clamp(2rem, 6vw, 3rem);
+    }
+
+    .page-header p {
+      font-size: 1rem;
+    }
+
+    .content :global(h1) {
+      font-size: 2rem;
+    }
+
+    .content :global(h2) {
+      font-size: 1.5rem;
+    }
+
+    .content :global(table) {
+      font-size: 0.85rem;
+    }
+
+    .content :global(th),
+    .content :global(td) {
+      padding: var(--space-xs);
+    }
   }
 </style>
