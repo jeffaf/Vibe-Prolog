@@ -718,7 +718,7 @@ class TestISOCut:
         assert results[0]['X'] == 1
 
     def test_cut_scope_limited_to_clause(self):
-        """Cut commits within the current clause, but allows trying alternative clauses"""
+        """Cut should prune alternative clauses for the same predicate"""
         prolog = PrologInterpreter()
         prolog.consult_string("""
             a(X) :- b(X), !.
@@ -727,10 +727,10 @@ class TestISOCut:
             b(2).
         """)
         results = list(prolog.query("a(X)"))
-        # Cut prevents backtracking within the first clause, but allows trying the second clause
-        assert len(results) == 2
+        # The cut `!` in the first clause of `a/1` prunes the choice point
+        # for the second clause `a(3).`, so only one solution should be found.
+        assert len(results) == 1
         assert results[0]['X'] == 1
-        assert results[1]['X'] == 3
 
     def test_cut_in_if_then_else(self):
         """Cut in condition of -> should work correctly"""
