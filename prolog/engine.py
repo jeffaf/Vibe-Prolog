@@ -1639,6 +1639,12 @@ class PrologEngine:
         # Raise the PrologThrow exception to unwind the call stack
         raise PrologThrow(thrown_term)
 
+    def _execute_callable_term(self, goal_term: any, subst: Substitution) -> Iterator[Substitution]:
+        """Executes a term if it is a valid goal (Compound, Atom, or Cut), otherwise fails silently."""
+        if isinstance(goal_term, (Compound, Atom, Cut)):
+            yield from self._solve_goals([goal_term], subst)
+        # No else: non-callable terms yield no results (fails)
+
     def _builtin_catch(self, goal: any, error: any, recovery: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in catch/3 - Exception handling with throw/1 support.
 
@@ -1648,24 +1654,15 @@ class PrologEngine:
         """
         goal = deref(goal, subst)
 
-        # Execute the goal, catching PrologThrow exceptions
         try:
-            if isinstance(goal, (Compound, Atom, Cut)):
-                yield from self._solve_goals([goal], subst)
-            else:
-                # Can't execute non-goal terms
-                return
+            yield from self._execute_callable_term(goal, subst)
         except PrologThrow as e:
             # Try to unify the thrown term with the error pattern
             new_subst = unify(error, e.term, subst)
             if new_subst is not None:
                 # Unification succeeded - execute recovery goal
                 recovery_goal = deref(recovery, new_subst)
-                if isinstance(recovery_goal, (Compound, Atom, Cut)):
-                    yield from self._solve_goals([recovery_goal], new_subst)
-                else:
-                    # Can't execute non-goal terms
-                    return
+                yield from self._execute_callable_term(recovery_goal, new_subst)
             else:
                 # Unification failed - re-raise the exception
                 raise
