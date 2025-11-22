@@ -212,8 +212,17 @@ class TestCutAndNegation:
         parser = PrologParser()
         clauses = parser.parse("test :- (\\+ q ; r), !.")
         body = clauses[0].body[0]
-        assert isinstance(body, Compound)
-        assert body.functor == ','
+        assert isinstance(body, Compound) and body.functor == ','
+
+        # Should parse as `','( ;(\+ q, r), !)`
+        disjunction, cut_op = body.args
+        assert isinstance(cut_op, Cut)
+
+        assert isinstance(disjunction, Compound) and disjunction.functor == ';'
+        negation, r_atom = disjunction.args
+        assert isinstance(negation, Compound) and negation.functor == '\\+'
+        assert negation.args[0].name == 'q'
+        assert r_atom.name == 'r'
 
 
 class TestArithmeticPrecedence:
