@@ -198,4 +198,3 @@ def vars(term: Any) -> set[Variable]:
 
     collect(term)
     return result
-    return term
