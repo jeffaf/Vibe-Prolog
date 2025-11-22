@@ -409,6 +409,16 @@ def main():
     repo_root = Path.cwd()
     changes_dir = repo_root / 'changes'
 
+    import shutil
+    import sys
+
+    # Check for required command-line tools
+    required = ["git", "gh"]
+    missing = [cmd for cmd in required if not shutil.which(cmd)]
+    if missing:
+        print(f"Error: Missing required commands: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+
     print("Change Tracker")
     print("=" * 50)
 
