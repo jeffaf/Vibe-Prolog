@@ -72,7 +72,7 @@
 - ✅ `once/1` – Call goal, commit to first solution
 
 ### Exception Handling (ISO 7.12)
-- ✅ `catch/3` – Exception handling (intercepts thrown terms from throw/1)
+- ⚠️ `catch/3` – Exception handling (simplified: only intercepts user-thrown terms from throw/1, lacks full ISO exception types)
 - ✅ `throw/1` – Throw exception term
 
 ### Input/Output (ISO 8.11-8.12)
@@ -81,9 +81,12 @@
 - ✅ `nl/0` – Write newline
 - ✅ `format/2`, `format/3` – Formatted output
 - ❌ `read/1` – Read term from input
-- ❌ `get_char/1`, `put_char/1` – Character I/O
-- ❌ `open/3`, `close/1` – File stream operations
-- ❌ `current_input/1`, `current_output/1` – Stream selection
+- ❌ `get_char/1` – Read character from input
+- ❌ `put_char/1` – Write character to output
+- ❌ `open/3` – Open file stream
+- ❌ `close/1` – Close stream
+- ❌ `current_input/1` – Get current input stream
+- ❌ `current_output/1` – Get current output stream
 
 ### Predicate Inspection (ISO 8.8)
 - ⚠️ `predicate_property/2` – Query predicate properties (limited to built-in detection)
@@ -97,7 +100,7 @@
 - ✅ `sort/2` – List sorting with deduplication
 
 ### Higher-Order Operations (Common Extensions)
-- ✅ `maplist/2` – Apply goal to list elements
+- ✅ `maplist/2` – Apply goal to list elements (SWI-Prolog extension, not ISO)
   - Streams goal solutions per element to preserve backtracking semantics
 
 ## Directives (ISO 7.4)
