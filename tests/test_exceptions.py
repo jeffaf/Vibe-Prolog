@@ -49,7 +49,7 @@ class TestThrowCatch:
         assert result['E'] == 'error'
 
     def test_throw_in_backtracking(self):
-        """Test throw in one disjunct - catch should handle and resume backtracking."""
+        """Test that a throw within a disjunction is caught and handled."""
         prolog = PrologInterpreter()
         # First disjunct throws, second succeeds
         results = list(prolog.query("catch((throw(error) ; X = success), E, X = caught)."))
