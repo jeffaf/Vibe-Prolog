@@ -125,7 +125,8 @@ def get_git_stats(since_date: datetime | None) -> dict:
         except subprocess.CalledProcessError:
             pass
     else:
-        # Get stats for all commits
+        # Get stats for all commits by diffing against the empty tree object.
+        # The hash '4b825dc642cb6eb9a060e54bf8d69288fbee4904' is the well-known ID for an empty tree.
         cmd = ['git', 'diff', '--shortstat', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', 'HEAD']
 
     try:
