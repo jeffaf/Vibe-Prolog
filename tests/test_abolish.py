@@ -134,6 +134,9 @@ class TestAbolishInputValidation:
         # Non-atom name
         assert not prolog.has_solution("abolish(123/1)")
 
+        # Float arity (must fail)
+        assert not prolog.has_solution("abolish(foo/1.0)")
+
         # Non-number arity
         assert not prolog.has_solution("abolish(foo/bar)")
 
