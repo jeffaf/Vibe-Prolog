@@ -70,7 +70,6 @@
 ### Meta-Logical Predicates (ISO 7.8)
 - ✅ `call/1` – Call goal dynamically
 - ✅ `once/1` – Call goal, commit to first solution
-- ✅ `maplist/2` – Apply goal to list elements (SWI-Prolog extension, not ISO)
 
 ### Exception Handling (ISO 7.12)
 - ⚠️ `catch/3` – Exception handling (simplified: only intercepts user-thrown terms from throw/1, lacks full ISO exception types)
@@ -101,7 +100,7 @@
 - ✅ `sort/2` – List sorting with deduplication
 
 ### Higher-Order Operations (Common Extensions)
-- ✅ `maplist/2` – Apply goal to list elements
+- ✅ `maplist/2` – Apply goal to list elements (SWI-Prolog extension, not ISO)
   - Streams goal solutions per element to preserve backtracking semantics
 
 ## Directives (ISO 7.4)
