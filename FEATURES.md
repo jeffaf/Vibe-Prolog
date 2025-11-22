@@ -64,7 +64,7 @@
 - ✅ `assertz/1` – Add clause at end
 - ✅ `assert/1` – Add clause at end (equivalent to assertz/1)
 - ✅ `retract/1` – Remove clause
-- ❌ `abolish/1` – Remove all clauses for predicate
+- ✅ `abolish/1` – Remove all clauses for predicate
 - ✅ `clause/2` – Retrieve clause definition
 
 ### Meta-Logical Predicates (ISO 7.8)
