@@ -12,6 +12,7 @@ import re
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
+import json
 
 
 def find_most_recent_change_file(changes_dir: Path) -> datetime | None:
@@ -106,11 +107,10 @@ def get_git_stats(since_date: datetime | None) -> dict:
     Returns:
         Dictionary with 'files_changed', 'insertions', 'deletions'
     """
-    cmd = ['git', 'diff', '--shortstat']
+    cmd = ['git', 'diff', '--numstat']
 
     if since_date:
         since_str = (since_date + timedelta(days=1)).strftime('%Y-%m-%d')
-        cmd.append(f'--since={since_str}')
         # Compare against the commit at that date
         try:
             ref_result = subprocess.run(
@@ -121,35 +121,36 @@ def get_git_stats(since_date: datetime | None) -> dict:
             )
             ref = ref_result.stdout.strip()
             if ref:
-                cmd = ['git', 'diff', '--shortstat', ref, 'HEAD']
+                cmd = ['git', 'diff', '--numstat', ref, 'HEAD']
+            else:
+                cmd.append(f'--since={since_str}')
         except subprocess.CalledProcessError:
             pass
     else:
         # Get stats for all commits by diffing against the empty tree object.
         # The hash '4b825dc642cb6eb9a060e54bf8d69288fbee4904' is the well-known ID for an empty tree.
-        cmd = ['git', 'diff', '--shortstat', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', 'HEAD']
+        cmd = ['git', 'diff', '--numstat', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', 'HEAD']
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        output = result.stdout.strip()
 
-        # Parse output like: "5 files changed, 123 insertions(+), 45 deletions(-)"
         stats = {'files_changed': 0, 'insertions': 0, 'deletions': 0}
 
-        if 'file' in output:
-            files_match = re.search(r'(\d+) files? changed', output)
-            if files_match:
-                stats['files_changed'] = int(files_match.group(1))
+        for line in result.stdout.strip().splitlines():
+            # git diff --numstat produces tab-separated: insertions  deletions  path
+            parts = line.split('\t')
+            if len(parts) != 3:
+                continue
 
-        if 'insertion' in output:
-            ins_match = re.search(r'(\d+) insertion', output)
-            if ins_match:
-                stats['insertions'] = int(ins_match.group(1))
+            insertions_raw, deletions_raw, _path = parts
 
-        if 'deletion' in output:
-            del_match = re.search(r'(\d+) deletion', output)
-            if del_match:
-                stats['deletions'] = int(del_match.group(1))
+            # Binary files are indicated with '-' for insertions/deletions; treat as 0 changes but still count file
+            insertions = int(insertions_raw) if insertions_raw.isdigit() else 0
+            deletions = int(deletions_raw) if deletions_raw.isdigit() else 0
+
+            stats['files_changed'] += 1
+            stats['insertions'] += insertions
+            stats['deletions'] += deletions
 
         return stats
     except subprocess.CalledProcessError:
@@ -181,7 +182,6 @@ def get_closed_issues(since_date: datetime | None) -> list[dict]:
             check=True
         )
 
-        import json
         all_issues = json.loads(result.stdout)
 
         # Filter by date if specified
@@ -246,7 +246,6 @@ def get_closed_prs(since_date: datetime | None) -> list[dict]:
             check=True
         )
 
-        import json
         all_prs = json.loads(result.stdout)
 
         # Filter by date if specified

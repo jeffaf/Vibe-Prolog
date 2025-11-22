@@ -6,6 +6,10 @@ These goals are what we are working towards in this project:
 - Fast: It should run prolog programs fast
 - Scalable: It should be able to run large prolog programs
 
+# Coding rules
+- Follow PEP8
+- Run all tests before pushing a PR
+
 # Prolog Interpreter - Development Guide
 
 This document provides an overview of the project structure and guidelines for development and testing.
