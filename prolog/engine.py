@@ -175,6 +175,7 @@ class PrologEngine:
         self._register_builtin("assertz", 1, registry, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
         self._register_builtin("assert", 1, registry, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
         self._register_builtin("retract", 1, registry, lambda args, subst: self._builtin_retract(args[0], subst))
+        self._register_builtin("abolish", 1, registry, lambda args, subst: self._builtin_abolish(args[0], subst))
 
     def _register_io_builtins(self, registry: BuiltinRegistry) -> None:
         self._register_builtin("write", 1, registry, lambda args, subst: self._builtin_write(args[0], subst))
@@ -1096,6 +1097,47 @@ class PrologEngine:
             self.clauses.pop(i)
             yield new_subst
 
+    def _builtin_abolish(self, indicator: any, subst: Substitution) -> Substitution | None:
+        """Built-in abolish/1 predicate - Remove all clauses for a predicate indicator."""
+        indicator = deref(indicator, subst)
+
+        # Validate indicator format: Name/Arity
+        if not isinstance(indicator, Compound) or indicator.functor != "/" or len(indicator.args) != 2:
+            return None
+
+        name_term, arity_term = indicator.args
+        name_term = deref(name_term, subst)
+        arity_term = deref(arity_term, subst)
+
+        # Strict validation: name must be Atom, arity must be non-negative integer
+        if not isinstance(name_term, Atom):
+            return None
+        if not isinstance(arity_term, Number) or not isinstance(arity_term.value, int) or arity_term.value < 0:
+            return None
+        arity = arity_term.value
+
+        name = name_term.name
+
+        # Filter out clauses that match the predicate indicator
+        # Only remove user-defined clauses, not built-ins
+        clauses_to_keep = []
+        for clause in self.clauses:
+            head = clause.head
+            matches = False
+            if isinstance(head, Compound):
+                if head.functor == name and len(head.args) == arity:
+                    matches = True
+            elif isinstance(head, Atom):
+                if head.name == name and arity == 0:
+                    matches = True
+
+            if not matches:
+                clauses_to_keep.append(clause)
+        self.clauses = clauses_to_keep
+
+        # Always succeed
+        return subst
+
     def _builtin_length(self, lst: any, length: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in length/2 predicate - List length."""
         lst = deref(lst, subst)
@@ -1493,7 +1535,7 @@ class PrologEngine:
             "atom", "number", "var", "nonvar",
             "functor", "arg",
             "findall", "bagof", "setof",
-            "assert", "asserta", "assertz", "retract",
+            "assert", "asserta", "assertz", "retract", "abolish",
             "maplist",
             "predicate_property", "current_predicate", "catch"
         }
@@ -1537,7 +1579,7 @@ class PrologEngine:
             # All solutions
             ("findall", 3), ("bagof", 3), ("setof", 3),
             # Database modification
-            ("asserta", 1), ("assertz", 1), ("assert", 1), ("retract", 1), ("clause", 2),
+            ("asserta", 1), ("assertz", 1), ("assert", 1), ("retract", 1), ("abolish", 1), ("clause", 2),
             # Meta-logical
             ("call", 1), ("once", 1),
             # Control flow
