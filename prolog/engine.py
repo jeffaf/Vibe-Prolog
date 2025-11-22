@@ -1121,13 +1121,20 @@ class PrologEngine:
 
         # Filter out clauses that match the predicate indicator
         # Only remove user-defined clauses, not built-ins
-        self.clauses = [
-            clause for clause in self.clauses
-            if not (
-                (isinstance(clause.head, Compound) and clause.head.functor == name and len(clause.head.args) == arity) or
-                (isinstance(clause.head, Atom) and clause.head.name == name and arity == 0)
-            )
-        ]
+        clauses_to_keep = []
+        for clause in self.clauses:
+            head = clause.head
+            matches = False
+            if isinstance(head, Compound):
+                if head.functor == name and len(head.args) == arity:
+                    matches = True
+            elif isinstance(head, Atom):
+                if head.name == name and arity == 0:
+                    matches = True
+
+            if not matches:
+                clauses_to_keep.append(clause)
+        self.clauses = clauses_to_keep
 
         # Always succeed
         return subst
