@@ -137,30 +137,17 @@ class ControlBuiltins:
         goal = deref(goal, subst)
         cleanup_goal = deref(cleanup_goal, subst)
 
-        # First, execute setup once
-        setup_succeeded = False
+        # First, execute setup once. If it fails, the loop is not entered.
         for setup_subst in engine._solve_goals([setup_goal], subst):
-            setup_succeeded = True
-            # Setup succeeded, now execute goal with cleanup
             try:
-                found_solution = False
-                for goal_subst in engine._solve_goals([goal], setup_subst):
-                    found_solution = True
-                    yield goal_subst
-                # Always call cleanup after goal completes
+                # Yield all solutions from the goal.
+                yield from engine._solve_goals([goal], setup_subst)
+            finally:
+                # Always call cleanup after goal completes, fails, or is interrupted.
                 for _ in engine._solve_goals([cleanup_goal], setup_subst):
                     break  # Just call cleanup once, ignore its result
-            except Exception:
-                # Even on exception, call cleanup
-                for _ in engine._solve_goals([cleanup_goal], setup_subst):
-                    break
-                raise
-            # Only run setup once
+            # Only run setup once.
             break
-
-        # If setup failed, don't execute goal or cleanup
-        if not setup_succeeded:
-            return
 
     @staticmethod
     def _builtin_call_cleanup(
@@ -176,20 +163,13 @@ class ControlBuiltins:
         goal = deref(goal, subst)
         cleanup_goal = deref(cleanup_goal, subst)
 
-        # Execute goal with cleanup
         try:
-            found_solution = False
-            for goal_subst in engine._solve_goals([goal], subst):
-                found_solution = True
-                yield goal_subst
-            # Always call cleanup after goal completes
+            # Yield all solutions from the goal.
+            yield from engine._solve_goals([goal], subst)
+        finally:
+            # Always call cleanup after goal completes, fails, or is interrupted.
             for _ in engine._solve_goals([cleanup_goal], subst):
                 break  # Just call cleanup once, ignore its result
-        except Exception:
-            # Even on exception, call cleanup
-            for _ in engine._solve_goals([cleanup_goal], subst):
-                break
-            raise
 
 
 __all__ = ["ControlBuiltins"]
