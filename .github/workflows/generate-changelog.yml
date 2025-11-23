@@ -61,3 +61,4 @@ jobs:
           title: "Daily changelog [${{ steps.date.outputs.date }}]"
           body: "Automated daily changelog generation."
           base: main
+          commit-to-shas: false
