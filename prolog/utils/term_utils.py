@@ -61,16 +61,6 @@ def terms_equal(term1: Any, term2: Any) -> bool:
     return False
 
 
-def list_to_compound(lst: List, subst: Substitution) -> Any:
-    """Convert a List structure into nested '.' compounds for ordering."""
-    tail_term = deref(lst.tail, subst) if lst.tail is not None else Atom("[]")
-
-    for elem in reversed(lst.elements):
-        tail_term = Compound(".", (elem, tail_term))
-
-    return tail_term
-
-
 def term_sort_key(term: Any, subst: Substitution | None = None) -> tuple:
     """Generate a deterministic sort key for a term."""
     subst = subst or Substitution()
