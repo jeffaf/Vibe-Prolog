@@ -79,5 +79,5 @@ class TestSyntaxErrors:
         """Parser should throw syntax_error for invalid syntax."""
         prolog = PrologInterpreter()
         # This should raise a ValueError wrapping a syntax_error
-        with pytest.raises(ValueError, match="Syntax error"):
+        with pytest.raises(PrologThrow):
             prolog.consult_string("foo(")
