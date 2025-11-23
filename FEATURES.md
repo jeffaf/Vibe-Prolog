@@ -72,8 +72,14 @@
 - ✅ `once/1` – Call goal, commit to first solution
 
 ### Exception Handling (ISO 7.12)
-- ⚠️ `catch/3` – Exception handling (simplified: only intercepts user-thrown terms from throw/1, lacks full ISO exception types)
+- ⚠️ `catch/3` – Exception handling (basic mechanism works, but built-ins don't throw ISO-structured errors)
 - ✅ `throw/1` – Throw exception term
+- ❌ ISO error term structure (`error(ErrorType, Context)`)
+- ❌ `instantiation_error` – Not raised by built-ins when required arguments are unbound
+- ❌ `type_error(Type, Culprit)` – Not raised by built-ins when arguments have wrong types
+- ❌ `domain_error(Domain, Culprit)` – Not raised by built-ins when values are outside valid domains
+- ❌ `syntax_error(Description)` – Parser throws Python exceptions instead of Prolog syntax_error terms
+- ❌ `existence_error(ObjectType, Culprit)` – Not implemented
 
 ### Input/Output (ISO 8.11-8.12)
 - ✅ `write/1` – Write term
@@ -175,13 +181,13 @@
 ## High-Priority Gaps and Deviations
 
 ### Critical Missing Features
-1. **Exception System**: `throw/1` and full ISO exception handling
+1. **ISO Error Term System**: Structured error terms (`error(ErrorType, Context)`) and systematic error reporting in built-ins (instantiation_error, type_error, domain_error, syntax_error, existence_error)
 2. **File I/O**: Essential for practical Prolog programs
 3. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
 4. **Operator Definition**: `op/3` for custom operators
 
 ### Significant Deviations
-1. **Exception Handling**: Simplified `catch/3` without full ISO exception types
+1. **Error Reporting**: Built-in predicates fail silently (return `None`) instead of throwing ISO-structured errors when given invalid arguments; parser raises Python exceptions instead of Prolog `syntax_error` terms; no error context (predicate name/arity) in error messages
 2. **Character Code Syntax**: Some advanced character code forms not supported
 
 ### Parser Limitations
