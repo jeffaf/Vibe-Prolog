@@ -5,10 +5,14 @@ Implements basic output predicates including formatted printing.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
+
+from lark.exceptions import LarkError
 
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
+from prolog.errors import raise_syntax_error
 from prolog.parser import Atom, Compound, List, Number, Variable, PrologParser
 from prolog.unification import Substitution, deref, unify
 from prolog.utils.list_utils import list_to_python, python_to_list
@@ -16,6 +20,53 @@ from prolog.utils.term_utils import term_to_string
 
 USER_INPUT_STREAM = Atom("user_input")
 USER_OUTPUT_STREAM = Atom("user_output")
+
+
+@dataclass(frozen=True)
+class OperatorInfo:
+    """Operator metadata for formatting terms with ignore_ops(false)."""
+
+    precedence: int
+    spec: str  # e.g., yfx, xfy, xfx, fy, fx
+
+    @property
+    def is_prefix(self) -> bool:
+        return len(self.spec) == 2
+
+
+# Default ISO-ish operator table for rendering terms when ignore_ops(false).
+OPERATOR_TABLE: dict[tuple[str, int], OperatorInfo] = {
+    (";", 2): OperatorInfo(1100, "xfy"),
+    ("->", 2): OperatorInfo(1050, "xfy"),
+    (",", 2): OperatorInfo(1000, "xfy"),
+    ("\\+", 1): OperatorInfo(900, "fy"),
+    ("=..", 2): OperatorInfo(700, "xfx"),
+    ("is", 2): OperatorInfo(700, "xfx"),
+    ("=", 2): OperatorInfo(700, "xfx"),
+    ("\\=", 2): OperatorInfo(700, "xfx"),
+    ("=:=", 2): OperatorInfo(700, "xfx"),
+    ("=\\=", 2): OperatorInfo(700, "xfx"),
+    ("<", 2): OperatorInfo(700, "xfx"),
+    (">", 2): OperatorInfo(700, "xfx"),
+    ("=<", 2): OperatorInfo(700, "xfx"),
+    (">=", 2): OperatorInfo(700, "xfx"),
+    ("==", 2): OperatorInfo(700, "xfx"),
+    ("\\==", 2): OperatorInfo(700, "xfx"),
+    ("@<", 2): OperatorInfo(700, "xfx"),
+    ("@=<", 2): OperatorInfo(700, "xfx"),
+    ("@>", 2): OperatorInfo(700, "xfx"),
+    ("@>=", 2): OperatorInfo(700, "xfx"),
+    ("+", 2): OperatorInfo(500, "yfx"),
+    ("-", 2): OperatorInfo(500, "yfx"),
+    ("*", 2): OperatorInfo(400, "yfx"),
+    ("/", 2): OperatorInfo(400, "yfx"),
+    ("//", 2): OperatorInfo(400, "yfx"),
+    ("mod", 2): OperatorInfo(400, "yfx"),
+    ("**", 2): OperatorInfo(200, "xfx"),
+    ("+", 1): OperatorInfo(200, "fy"),
+    ("-", 1): OperatorInfo(200, "fy"),
+    (":-", 2): OperatorInfo(1200, "xfx"),
+}
 
 class IOBuiltins:
     """Built-ins for standard output and formatting."""
@@ -238,9 +289,8 @@ class IOBuiltins:
 
             parsed_term = parser.parse_term(input_str)
             return unify(term_var, parsed_term, subst)
-        except Exception:
-            # Parse error - fail
-            return None
+        except (ValueError, LarkError) as exc:
+            raise_syntax_error("read_from_chars/2", exc)
 
     @staticmethod
     def _builtin_write_term_to_chars(
@@ -298,7 +348,12 @@ class IOBuiltins:
 
     @staticmethod
     def _term_to_chars_string(
-        term: Any, subst: Substitution, ignore_ops: bool, numbervars: bool, quoted: bool
+        term: Any,
+        subst: Substitution,
+        ignore_ops: bool,
+        numbervars: bool,
+        quoted: bool,
+        parent_prec: int = 1200,
     ) -> str:
         """Convert a term to string with specified options."""
         term = deref(term, subst)
@@ -344,7 +399,9 @@ class IOBuiltins:
 
             # Handle list elements
             elements_str = [
-                IOBuiltins._term_to_chars_string(e, subst, ignore_ops, numbervars, quoted)
+                IOBuiltins._term_to_chars_string(
+                    e, subst, ignore_ops, numbervars, quoted, 1200
+                )
                 for e in term.elements
             ]
 
@@ -353,22 +410,28 @@ class IOBuiltins:
                 isinstance(term.tail, List) and not term.tail.elements and term.tail.tail is None
             ):
                 tail_str = IOBuiltins._term_to_chars_string(
-                    term.tail, subst, ignore_ops, numbervars, quoted
+                    term.tail, subst, ignore_ops, numbervars, quoted, 1200
                 )
                 return f"[{','.join(elements_str)}|{tail_str}]"
 
             return f"[{','.join(elements_str)}]"
 
         if isinstance(term, Compound):
-            # TODO: Implement proper operator precedence and spacing for ignore_ops=False
-            # For now, always use canonical form: functor(args)
+            if not ignore_ops:
+                operator_rendered = IOBuiltins._format_operator_term(
+                    term, subst, ignore_ops, numbervars, quoted, parent_prec
+                )
+                if operator_rendered is not None:
+                    return operator_rendered
             if not term.args:
                 if quoted and IOBuiltins._needs_quoting(term.functor):
                     escaped = term.functor.replace('\\', '\\\\').replace("'", "\\'")
                     return f"'{escaped}'"
                 return term.functor
             args_str = ','.join(
-                IOBuiltins._term_to_chars_string(arg, subst, ignore_ops, numbervars, quoted)
+                IOBuiltins._term_to_chars_string(
+                    arg, subst, ignore_ops, numbervars, quoted, 1200
+                )
                 for arg in term.args
             )
             functor = term.functor
@@ -380,18 +443,90 @@ class IOBuiltins:
         return str(term)
 
     @staticmethod
+    def _format_operator_term(
+        term: Compound,
+        subst: Substitution,
+        ignore_ops: bool,
+        numbervars: bool,
+        quoted: bool,
+        parent_prec: int,
+    ) -> str | None:
+        info = OPERATOR_TABLE.get((term.functor, len(term.args)))
+        if info is None:
+            return None
+
+        if info.is_prefix:
+            arg_limit = IOBuiltins._child_precedence_limit(info, "right")
+            arg_str = IOBuiltins._term_to_chars_string(
+                term.args[0], subst, ignore_ops, numbervars, quoted, arg_limit
+            )
+            rendered = IOBuiltins._render_prefix(term.functor, arg_str)
+        else:
+            left_limit = IOBuiltins._child_precedence_limit(info, "left")
+            right_limit = IOBuiltins._child_precedence_limit(info, "right")
+            left_str = IOBuiltins._term_to_chars_string(
+                term.args[0], subst, ignore_ops, numbervars, quoted, left_limit
+            )
+            right_str = IOBuiltins._term_to_chars_string(
+                term.args[1], subst, ignore_ops, numbervars, quoted, right_limit
+            )
+            rendered = IOBuiltins._render_infix(term.functor, left_str, right_str)
+
+        if info.precedence > parent_prec:
+            return f"({rendered})"
+        return rendered
+
+    @staticmethod
+    def _child_precedence_limit(info: OperatorInfo, position: str) -> int:
+        if info.is_prefix:
+            char = info.spec[1]
+        else:
+            char = info.spec[0] if position == "left" else info.spec[2]
+        return info.precedence - 1 if char == "x" else info.precedence
+
+    @staticmethod
+    def _render_prefix(functor: str, arg_str: str) -> str:
+        if functor and functor[0].isalpha():
+            return f"{functor} {arg_str}"
+        return f"{functor}{arg_str}"
+
+    @staticmethod
+    def _render_infix(functor: str, left: str, right: str) -> str:
+        if functor in {":-", "?-"}:
+            return f"{left} {functor} {right}"
+        if functor and functor[0].isalpha():
+            return f"{left} {functor} {right}"
+        if functor == ",":
+            return f"{left},{right}"
+        if functor == ";":
+            return f"{left};{right}"
+        return f"{left}{functor}{right}"
+
+    @staticmethod
     def _needs_quoting(atom: str) -> bool:
         """Check if an atom needs quoting."""
         if not atom:
             return True
 
-        # Starts with lowercase or special operators don't need quoting
-        if atom[0].islower() or atom in ['[]', '{}', '!', ';', '|']:
-            # Check if it's alphanumeric + underscore
-            if all(c.isalnum() or c == '_' for c in atom):
-                return False
+        # An atom starting with a lowercase letter followed by alphanumerics or underscores does not need quoting.
+        if atom[0].islower() and all(c.isalnum() or c == '_' for c in atom):
+            return False
 
-        # Everything else needs quoting
+        # A set of common graphic/symbolic atoms that do not need quoting.
+        # This set is not exhaustive but covers many common cases.
+        unquoted_graphic_atoms = {
+            '!', ';', ',', '+', '-', '*', '/', '=', ':-', '->',
+            '<', '>', '=<', '>=', '=:=', '=\\=', '==', '\\==',
+            '@<', '@>', '@=<', '@>=', 'is', '=..', '\\+'
+        }
+        if atom in unquoted_graphic_atoms:
+            return False
+
+        # Atoms that are just `[]` or `{}`
+        if atom in ('[]', '{}'):
+            return False
+
+        # Everything else needs quoting (e.g., starts with uppercase, contains spaces, looks like a number).
         return True
 
 

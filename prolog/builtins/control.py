@@ -133,18 +133,20 @@ class ControlBuiltins:
         and always calls Cleanup after Goal completes (whether it succeeds or fails).
         """
         setup_goal, goal, cleanup_goal = args
-        setup_goal = deref(setup_goal, subst)
-        goal = deref(goal, subst)
-        cleanup_goal = deref(cleanup_goal, subst)
 
         # First, execute setup once. If it fails, the loop is not entered.
-        for setup_subst in engine._solve_goals([setup_goal], subst):
+        for setup_subst in engine._solve_goals([deref(setup_goal, subst)], subst):
+            last_subst = setup_subst
             try:
                 # Yield all solutions from the goal.
-                yield from engine._solve_goals([goal], setup_subst)
+                goal_d = deref(goal, setup_subst)
+                for solution_subst in engine._solve_goals([goal_d], setup_subst):
+                    last_subst = solution_subst
+                    yield solution_subst
             finally:
                 # Always call cleanup after goal completes, fails, or is interrupted.
-                for _ in engine._solve_goals([cleanup_goal], setup_subst):
+                cleanup_goal_d = deref(cleanup_goal, last_subst)
+                for _ in engine._solve_goals([cleanup_goal_d], last_subst):
                     break  # Just call cleanup once, ignore its result
             # Only run setup once.
             break
@@ -160,15 +162,18 @@ class ControlBuiltins:
         and always calls Cleanup after Goal completes (whether it succeeds or fails).
         """
         goal, cleanup_goal = args
-        goal = deref(goal, subst)
-        cleanup_goal = deref(cleanup_goal, subst)
+        last_subst = subst
 
         try:
             # Yield all solutions from the goal.
-            yield from engine._solve_goals([goal], subst)
+            goal_d = deref(goal, subst)
+            for solution_subst in engine._solve_goals([goal_d], subst):
+                last_subst = solution_subst
+                yield solution_subst
         finally:
             # Always call cleanup after goal completes, fails, or is interrupted.
-            for _ in engine._solve_goals([cleanup_goal], subst):
+            cleanup_goal_d = deref(cleanup_goal, last_subst)
+            for _ in engine._solve_goals([cleanup_goal_d], last_subst):
                 break  # Just call cleanup once, ignore its result
 
 

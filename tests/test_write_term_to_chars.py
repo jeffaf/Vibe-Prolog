@@ -116,7 +116,7 @@ class TestWriteTermToChars:
         assert chars_str == 'f(a,b)'
 
     def test_compound_ignore_ops_false(self):
-        """Test writing compound term with ignore_ops(false) - should also use canonical form for now."""
+        """Non-operator compound terms should stay in canonical form regardless of ignore_ops."""
         prolog = PrologInterpreter()
         result = prolog.query_once("write_term_to_chars(f(a,b), [ignore_ops(false)], Chars).")
         assert result is not None
@@ -133,6 +133,47 @@ class TestWriteTermToChars:
         assert result_true is not None
         assert result_false is not None
         assert result_true['Chars1'] == result_false['Chars2']
+
+    def test_arithmetic_ignore_ops_true(self):
+        """ignore_ops(true) should emit canonical operator form."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once(
+            "write_term_to_chars(1+2, [ignore_ops(true)], Chars)."
+        )
+        assert result is not None
+        chars_str = ''.join(result['Chars'])
+        assert chars_str == '+(1,2)'
+
+    def test_arithmetic_ignore_ops_false(self):
+        """ignore_ops(false) should emit infix operator form respecting precedence."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once(
+            "write_term_to_chars(1+2, [ignore_ops(false)], Chars)."
+        )
+        assert result is not None
+        chars_str = ''.join(result['Chars'])
+        assert chars_str == '1+2'
+
+    def test_arithmetic_parentheses(self):
+        """Ensure parentheses are emitted when needed for precedence."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once(
+            "write_term_to_chars((1+2)*3, [ignore_ops(false)], Chars)."
+        )
+        assert result is not None
+        chars_str = ''.join(result['Chars'])
+        assert chars_str == '(1+2)*3'
+
+    def test_is_operator_spacing(self):
+        """Alphabetic operators like is should include spaces for readability/lexing."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once(
+            "write_term_to_chars(X is 1+2, [ignore_ops(false)], Chars)."
+        )
+        assert result is not None
+        chars_str = ''.join(result['Chars'])
+        assert ' is ' in chars_str
+        assert chars_str.endswith('1+2')
 
     def test_numbervars_simple(self):
         """Test numbervars option with $VAR(0)."""
@@ -328,12 +369,22 @@ class TestReadFromChars:
         term_str = str(result['Term'])
         assert 'hello' in term_str
 
-    def test_read_invalid_syntax(self):
-        """Test reading invalid syntax fails gracefully."""
+    def test_read_invalid_syntax_raises(self):
+        """Test reading invalid syntax surfaces a syntax_error that catch/3 can intercept."""
         prolog = PrologInterpreter()
-        result = prolog.query_once("read_from_chars('foo(', Term).")
-        # Should fail due to parse error
-        assert result is None
+        result = prolog.query_once(
+            "catch(read_from_chars('foo(', Term), Error, true)."
+        )
+        assert result is not None
+        error_term = result['Error']
+        assert isinstance(error_term, dict)
+        assert 'error' in error_term
+        syntax_descriptor = error_term['error'][0]
+        if isinstance(syntax_descriptor, dict):
+            assert 'syntax_error' in syntax_descriptor
+        else:
+            assert syntax_descriptor == 'syntax_error'
+        assert error_term['error'][1] == 'read_from_chars/2'
 
 
 class TestEdgeCases:

@@ -80,7 +80,7 @@
 - ❌ `instantiation_error` – Not raised by built-ins when required arguments are unbound
 - ❌ `type_error(Type, Culprit)` – Not raised by built-ins when arguments have wrong types
 - ❌ `domain_error(Domain, Culprit)` – Not raised by built-ins when values are outside valid domains
-- ❌ `syntax_error(Description)` – Parser throws Python exceptions instead of Prolog syntax_error terms
+- ⚠️ `syntax_error(Description)` – `read_from_chars/2`, the interpreter's query interface, and `consult/1` now throw ISO `error(syntax_error(_), _)` terms; other parser entry points (e.g., future `read/1`) still raise Python exceptions
 - ❌ `existence_error(ObjectType, Culprit)` – Not implemented
 
 ### Input/Output (ISO 8.11-8.12)
@@ -112,6 +112,10 @@
 ### Higher-Order Operations (Common Extensions)
 - ✅ `maplist/2` – Apply goal to list elements (SWI-Prolog extension, not ISO)
   - Streams goal solutions per element to preserve backtracking semantics
+
+### System Predicates
+- ❌ `argv/1` – Access command-line arguments as list
+- ❌ `current_prolog_flag(argv, Args)` – ISO-style access to command-line arguments
 
 ## Directives (ISO 7.4)
 
