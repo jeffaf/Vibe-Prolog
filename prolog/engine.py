@@ -1,5 +1,8 @@
 """Prolog query engine with backtracking."""
 
+from __future__ import annotations
+
+import inspect
 from typing import Callable, Iterator, TypeAlias
 from collections import OrderedDict
 from collections.abc import Iterator as IteratorABC
@@ -20,9 +23,8 @@ from prolog.utils.variable_utils import (
     strip_existentials,
 )
 
-
 BuiltinResult: TypeAlias = Iterator[Substitution] | Substitution | None
-BuiltinHandler: TypeAlias = Callable[[tuple, Substitution], BuiltinResult]
+BuiltinHandler: TypeAlias = Callable[[tuple, Substitution, "PrologEngine | None"], BuiltinResult]
 BuiltinRegistry: TypeAlias = dict[tuple[str, int], BuiltinHandler]
 
 
@@ -162,13 +164,16 @@ class PrologEngine:
         if handler is None:
             return None
 
-        result = handler(args, subst)
+        result = handler(args, subst, self)
         return self._normalize_builtin_result(result)
 
     def _build_builtin_registry(self) -> BuiltinRegistry:
         """Create the functor/arity dispatch table for built-in predicates."""
         registry: BuiltinRegistry = {}
 
+        # Legacy built-ins registered directly on the engine. These wrappers
+        # will be incrementally replaced by modular registrations under
+        # ``prolog.builtins`` in Phase 3.
         for registrar in (
             self._register_control_builtins,
             self._register_arithmetic_builtins,
@@ -179,10 +184,45 @@ class PrologEngine:
         ):
             registrar(registry)
 
+        # New-style modular built-ins will be registered here. For example:
+        #
+        # from prolog.builtins import type_tests
+        # type_tests.TypeTestBuiltins.register(registry, self)
+        #
+        # The dummy module remains available for infrastructure validation.
         return registry
 
     def _register_builtin(self, functor: str, arity: int, registry: BuiltinRegistry, handler: BuiltinHandler) -> None:
-        registry[(functor, arity)] = handler
+        registry[(functor, arity)] = self._wrap_builtin_handler(handler)
+
+    def _wrap_builtin_handler(self, handler: Callable) -> BuiltinHandler:
+        """Ensure builtin handlers conform to the 3-argument calling convention."""
+
+        try:
+            signature = inspect.signature(handler)
+        except (TypeError, ValueError):
+            def wrapper(args, subst, _engine):
+                return handler(args, subst)
+
+            return wrapper
+
+        required_params = [
+            p
+            for p in signature.parameters.values()
+            if p.default is inspect.Parameter.empty
+            and p.kind in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            )
+        ]
+
+        if len(required_params) >= 3:
+            return handler  # type: ignore[return-value]
+
+        def wrapper(args, subst, _engine):
+            return handler(args, subst)
+
+        return wrapper
 
     def _register_control_builtins(self, registry: BuiltinRegistry) -> None:
         self._register_builtin("=", 2, registry, lambda args, subst: unify(args[0], args[1], subst))
