@@ -70,6 +70,8 @@
 ### Meta-Logical Predicates (ISO 7.8)
 - ✅ `call/1` – Call goal dynamically
 - ✅ `once/1` – Call goal, commit to first solution
+- ✅ `setup_call_cleanup/3` – Execute goal with setup and cleanup
+- ✅ `call_cleanup/2` – Execute goal with cleanup
 
 ### Exception Handling (ISO 7.12)
 - ⚠️ `catch/3` – Exception handling (basic mechanism works, but built-ins don't throw ISO-structured errors)
@@ -86,6 +88,8 @@
 - ✅ `writeln/1` – Write term with newline
 - ✅ `nl/0` – Write newline
 - ✅ `format/2`, `format/3` – Formatted output
+- ✅ `read_from_chars/2` – Parse term from character list/string
+- ⚠️ `write_term_to_chars/3` – Write term to character list with options (basic implementation, operator handling incomplete)
 - ❌ `read/1` – Read term from input
 - ❌ `get_char/1` – Read character from input
 - ❌ `put_char/1` – Write character to output

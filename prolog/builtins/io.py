@@ -9,9 +9,9 @@ from typing import Any
 
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import Atom, Compound, List, Number, Variable
+from prolog.parser import Atom, Compound, List, Number, Variable, PrologParser
 from prolog.unification import Substitution, deref, unify
-from prolog.utils.list_utils import list_to_python
+from prolog.utils.list_utils import list_to_python, python_to_list
 from prolog.utils.term_utils import term_to_string
 
 
@@ -34,6 +34,12 @@ class IOBuiltins:
             ),
         )
         register_builtin(registry, "nl", 0, IOBuiltins._builtin_newline)
+        register_builtin(
+            registry, "read_from_chars", 2, IOBuiltins._builtin_read_from_chars
+        )
+        register_builtin(
+            registry, "write_term_to_chars", 3, IOBuiltins._builtin_write_term_to_chars
+        )
 
     @staticmethod
     def _builtin_write(
@@ -175,6 +181,218 @@ class IOBuiltins:
                 i += 1
 
         return result
+
+    @staticmethod
+    def _builtin_read_from_chars(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        """read_from_chars/2 - Parse a Prolog term from a string.
+
+        read_from_chars(+Chars, -Term)
+        Parses Chars (atom or list of chars) as a Prolog term and unifies with Term.
+        """
+        chars_term, term_var = args
+        chars_term = deref(chars_term, subst)
+
+        # Convert input to string
+        if isinstance(chars_term, Atom):
+            input_str = chars_term.name
+        elif isinstance(chars_term, List):
+            try:
+                char_list = list_to_python(chars_term, subst)
+                # Convert list of character atoms to string
+                input_str = ''.join(
+                    c.name if isinstance(c, Atom) else str(c)
+                    for c in char_list
+                )
+            except (TypeError, AttributeError):
+                return None
+        else:
+            return None
+
+        # Parse the string as a Prolog term
+        try:
+            parser = PrologParser()
+            # Remove trailing period if present (parse expects no period)
+            input_str = input_str.strip()
+            if input_str.endswith('.'):
+                input_str = input_str[:-1].strip()
+
+            parsed_term = parser.parse_term(input_str)
+            return unify(term_var, parsed_term, subst)
+        except Exception:
+            # Parse error - fail
+            return None
+
+    @staticmethod
+    def _builtin_write_term_to_chars(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        """write_term_to_chars/3 - Convert a Prolog term to a character list.
+
+        write_term_to_chars(+Term, +Options, -Chars)
+        Converts Term to a string representation according to Options and unifies with Chars.
+
+        Supported options:
+        - ignore_ops(true/false): Write in canonical form
+        - numbervars(true/false): Convert $VAR(N) to variable names (A, B, C, ...)
+        - quoted(true/false): Quote atoms that need quoting
+        - variable_names([]): Variable name mappings (not yet implemented)
+        """
+        term, options_term, chars_var = args
+        term = deref(term, subst)
+        options_term = deref(options_term, subst)
+
+        # Parse options
+        try:
+            options_list = list_to_python(options_term, subst)
+        except TypeError:
+            return None
+
+        # Extract option values
+        ignore_ops = False
+        numbervars = False
+        quoted = False
+
+        for opt in options_list:
+            opt = deref(opt, subst)
+            if isinstance(opt, Compound):
+                if opt.functor == "ignore_ops" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    ignore_ops = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "numbervars" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    numbervars = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "quoted" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    quoted = isinstance(val, Atom) and val.name == "true"
+
+        # Convert term to string
+        output_str = IOBuiltins._term_to_chars_string(
+            term, subst, ignore_ops, numbervars, quoted
+        )
+
+        # Convert string to list of character atoms
+        char_list = [Atom(c) for c in output_str]
+        chars_list = python_to_list(char_list)
+
+        return unify(chars_var, chars_list, subst)
+
+    @staticmethod
+    def _term_to_chars_string(
+        term: Any, subst: Substitution, ignore_ops: bool, numbervars: bool, quoted: bool
+    ) -> str:
+        """Convert a term to string with specified options."""
+        term = deref(term, subst)
+
+        # Handle $VAR(N) for numbervars
+        if numbervars and isinstance(term, Compound) and term.functor == "$VAR" and len(term.args) == 1:
+            arg = deref(term.args[0], subst)
+            if isinstance(arg, Number) and isinstance(arg.value, int) and arg.value >= 0:
+                # Convert to A, B, C, ..., Z, A1, B1, ...
+                n = arg.value
+                var_name = chr(ord('A') + (n % 26))
+                if n >= 26:
+                    var_name += str(n // 26)
+                return var_name
+
+        if isinstance(term, Atom):
+            if quoted and IOBuiltins._needs_quoting(term.name):
+                # Escape special characters
+                escaped = term.name.replace('\\', '\\\\').replace("'", "\\'")
+                return f"'{escaped}'"
+            return term.name
+
+        if isinstance(term, Number):
+            val = term.value
+            if isinstance(val, float):
+                # Handle scientific notation
+                s = str(val)
+                if 'e' in s:
+                    return s
+                # Check if we need scientific notation
+                if abs(val) >= 1e10 or (abs(val) < 1e-4 and val != 0):
+                    return f"{val:e}"
+                return s
+            return str(val)
+
+        if isinstance(term, Variable):
+            return f"_{term.name}"
+
+        if isinstance(term, List):
+            # Handle empty list
+            if not term.elements and term.tail is None:
+                return "[]"
+
+            # Handle list elements
+            elements_str = [
+                IOBuiltins._term_to_chars_string(e, subst, ignore_ops, numbervars, quoted)
+                for e in term.elements
+            ]
+
+            # Handle tail
+            if term.tail is not None and not (
+                isinstance(term.tail, List) and not term.tail.elements and term.tail.tail is None
+            ):
+                tail_str = IOBuiltins._term_to_chars_string(
+                    term.tail, subst, ignore_ops, numbervars, quoted
+                )
+                return f"[{','.join(elements_str)}|{tail_str}]"
+
+            return f"[{','.join(elements_str)}]"
+
+        if isinstance(term, Compound):
+            if ignore_ops:
+                # Canonical form: always use functor(args)
+                if not term.args:
+                    if quoted and IOBuiltins._needs_quoting(term.functor):
+                        escaped = term.functor.replace('\\', '\\\\').replace("'", "\\'")
+                        return f"'{escaped}'"
+                    return term.functor
+                args_str = ','.join(
+                    IOBuiltins._term_to_chars_string(arg, subst, ignore_ops, numbervars, quoted)
+                    for arg in term.args
+                )
+                functor = term.functor
+                if quoted and IOBuiltins._needs_quoting(functor):
+                    escaped = functor.replace('\\', '\\\\').replace("'", "\\'")
+                    functor = f"'{escaped}'"
+                return f"{functor}({args_str})"
+            else:
+                # Regular form: use operators when appropriate
+                # For now, use canonical form (operator handling is complex)
+                # TODO: Implement proper operator precedence and spacing
+                if not term.args:
+                    if quoted and IOBuiltins._needs_quoting(term.functor):
+                        escaped = term.functor.replace('\\', '\\\\').replace("'", "\\'")
+                        return f"'{escaped}'"
+                    return term.functor
+                args_str = ','.join(
+                    IOBuiltins._term_to_chars_string(arg, subst, ignore_ops, numbervars, quoted)
+                    for arg in term.args
+                )
+                functor = term.functor
+                if quoted and IOBuiltins._needs_quoting(functor):
+                    escaped = functor.replace('\\', '\\\\').replace("'", "\\'")
+                    functor = f"'{escaped}'"
+                return f"{functor}({args_str})"
+
+        return str(term)
+
+    @staticmethod
+    def _needs_quoting(atom: str) -> bool:
+        """Check if an atom needs quoting."""
+        if not atom:
+            return True
+
+        # Starts with lowercase or special operators don't need quoting
+        if atom[0].islower() or atom in ['[]', '{}', '!', ';', '|']:
+            # Check if it's alphanumeric + underscore
+            if all(c.isalnum() or c == '_' for c in atom):
+                return False
+
+        # Everything else needs quoting
+        return True
 
 
 __all__ = ["IOBuiltins"]
