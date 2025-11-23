@@ -12,7 +12,7 @@ from lark.exceptions import (
 
 def raise_syntax_error(context: str, exc: Exception | None = None) -> None:
     """Raise a PrologThrow carrying error(syntax_error(_), Context)."""
-    from prolog.engine import PrologThrow
+    from prolog.exceptions import PrologThrow
     from prolog.parser import Atom, Compound
 
     reason_atom = _syntax_error_reason(exc)

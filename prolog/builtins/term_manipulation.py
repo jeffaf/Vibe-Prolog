@@ -133,13 +133,13 @@ class TermManipulationBuiltins:
         term_deref = deref(term, subst)
 
         # Check N is an integer
-        engine._check_type(n_deref, Number, 'integer', subst, 'arg/3')
+        engine._check_type(n, Number, 'integer', subst, 'arg/3')
         if not isinstance(n_deref.value, int):
             error_term = PrologError.type_error('integer', n_deref, 'arg/3')
             raise PrologThrow(error_term)
 
         # Check Term is a compound
-        engine._check_type(term_deref, Compound, 'compound', subst, 'arg/3')
+        engine._check_type(term, Compound, 'compound', subst, 'arg/3')
 
         n_val = int(n_deref.value)
 
