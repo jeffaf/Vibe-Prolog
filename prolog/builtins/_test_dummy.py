@@ -17,4 +17,5 @@ class DummyBuiltins:
     @staticmethod
     def register(registry, engine_ref=None):
         """Register dummy built-ins in the provided registry."""
-        registry[("dummy_test", 0)] = DummyBuiltins.dummy_test
+        from prolog.builtins import register_builtin
+        register_builtin(registry, "dummy_test", 0, DummyBuiltins.dummy_test)
