@@ -515,7 +515,7 @@ class IOBuiltins:
         # A set of common graphic/symbolic atoms that do not need quoting.
         # This set is not exhaustive but covers many common cases.
         unquoted_graphic_atoms = {
-            '!', ';', ',', '+', '-', '*', '/', '=', ':-', '->',
+            '!', ';', ',', '+', '-', '*', '/', '//', '**', '=', ':-', '->', '\=',
             '<', '>', '=<', '>=', '=:=', '=\\=', '==', '\\==',
             '@<', '@>', '@=<', '@>=', 'is', '=..', '\\+'
         }
