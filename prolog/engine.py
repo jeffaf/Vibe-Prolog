@@ -1191,7 +1191,7 @@ class PrologEngine:
 
         # Convert to Python list
         try:
-                py_list = list_to_python(lst, subst)
+            py_list = list_to_python(lst, subst)
         except TypeError:
             return None
 
