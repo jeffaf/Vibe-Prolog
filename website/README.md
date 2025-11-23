@@ -1,4 +1,4 @@
-# Vibe Prolog Websitex
+# Vibe Prolog Website
 
 ## Overview
 

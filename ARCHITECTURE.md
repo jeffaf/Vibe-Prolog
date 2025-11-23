@@ -114,7 +114,7 @@ non-deterministic predicates.
 
    ```python
    @staticmethod
-   def my_builtin(args: tuple, subst: Substitution, engine) -> BuiltinResult:
+   def my_builtin(args: BuiltinArgs, subst: Substitution, engine: EngineContext) -> BuiltinResult:
        """my_builtin/N - Description."""
        # Implementation
    ```

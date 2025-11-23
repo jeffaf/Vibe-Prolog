@@ -393,7 +393,11 @@ class PrologTransformer(Transformer):
             # This is base'char format - extract just the character
             parts = code_str.split("'")
             if len(parts) >= 2:
-                char = parts[1][0] if parts[1] else ""
+                if not parts[1]:
+                    # This case, e.g., from `16''`, would cause `ord('')` to crash.
+                    # Treating as an invalid char code for now to prevent a crash.
+                    return Number(0)
+                char = parts[1][0]
                 return Number(ord(char))
 
         # Standard 0'X format
