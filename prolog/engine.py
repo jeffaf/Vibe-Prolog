@@ -192,7 +192,7 @@ class PrologEngine:
         # The dummy module remains available for infrastructure validation.
         return registry
 
-    def _register_builtin(self, functor: str, arity: int, registry: BuiltinRegistry, handler: BuiltinHandler) -> None:
+    def _register_builtin(self, functor: str, arity: int, registry: BuiltinRegistry, handler: Callable) -> None:
         registry[(functor, arity)] = self._wrap_builtin_handler(handler)
 
     def _wrap_builtin_handler(self, handler: Callable) -> BuiltinHandler:
