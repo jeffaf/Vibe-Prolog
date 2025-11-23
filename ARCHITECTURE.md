@@ -214,7 +214,7 @@ you should be aware of:
   `instantiation_error`, `type_error`, etc.) still needs work; most built-ins
   fail silently instead of raising structured errors.
 - A handful of parser edge cases remain unimplemented (block comments,
-  `0'\xHH\` hex escapes, and `Base'atom'digit` syntax).
+  `0'\\xHH\\` hex escapes, and `16'mod'2` syntax).
 - No DCG, module system, CLP libraries, or tail-call optimization. Very deep
   recursion can still overflow Python's stack in pathological cases.
 
