@@ -52,7 +52,7 @@ Example:
 from prolog import PrologInterpreter
 
 prolog = PrologInterpreter()
-# This will throw an instantiation error
+# This will throw an instantiation error, which is caught by catch/3
 result = prolog.query_once("catch(arg(N, foo(a), X), error(E, _), true).")
 print(result['E'])  # instantiation_error
 ```
