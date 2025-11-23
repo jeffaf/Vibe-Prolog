@@ -7,7 +7,7 @@ from prolog.utils.list_utils import (
     match_list_to_length,
     python_to_list,
 )
-from prolog.utils.term_utils import list_to_compound, term_sort_key, term_to_string, terms_equal
+from prolog.utils.term_utils import term_sort_key, term_to_string, terms_equal
 from prolog.utils.variable_utils import (
     collect_vars,
     collect_vars_in_order,
@@ -21,7 +21,6 @@ __all__ = [
     "list_to_python",
     "match_list_to_length",
     "python_to_list",
-    "list_to_compound",
     "term_sort_key",
     "term_to_string",
     "terms_equal",
