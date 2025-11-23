@@ -32,18 +32,25 @@ jobs:
         run: |
           python ai-tools/kilocode/change-tracker/generate-changelog.py
 
-      - name: Commit changelog
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Prepare changelog branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b changelog/daily-${{ github.run_id }}
           git add changes/
-          git commit -m "Generate daily changelog [skip ci]" || echo "No changes to commit"
+          # Files staged but not committed; create-pull-request will handle commit/PR
 
       - name: Create Pull Request for changelog
         uses: peter-evans/create-pull-request@v5
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           branch: changelog/daily-${{ github.run_id }}
-          title: "Automated daily changelog"
-          body: "This PR adds the daily changelog for run ${{ github.run_id }}."
+          commit-message: "Generate daily changelog [skip ci]"
+          title: "Daily changelog [${{ steps.date.outputs.date }}]"
+          body: "Automated daily changelog generation."
           base: main
+          commit-to-shas: false
