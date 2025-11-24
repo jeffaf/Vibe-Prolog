@@ -94,8 +94,8 @@ def get_git_stats(since_date: datetime | None) -> dict | None:
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError:
-        print("Error running git log for stats", file=sys.stderr)
+    except subprocess.CalledProcessError as exc:
+        print(f"Error running git log for stats: {exc}", file=sys.stderr)
         return None
 
     files_touched: set[str] = set()

@@ -142,8 +142,12 @@ def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None
     checkout_pr_branch(branch_name)
     run(["git", "pull"], capture_output=False)
 
-    helper_path = ensure_gh_pr_helper(repo_root)
-    pr_output = get_gh_pr_output(helper_path, owner, repo, pr_number)
+    from .gh_pr_helper import fetch_pr_comments, format_comments_as_markdown
+
+    review_comments, issue_comments = fetch_pr_comments(owner, repo, pr_number)
+    pr_output = format_comments_as_markdown(
+        review_comments, issue_comments, owner, repo, pr_number
+    )
 
     changes_to_make = build_changes_to_make(pr_output)
     run_kilocode_with_changes(changes_to_make)
