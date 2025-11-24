@@ -49,7 +49,7 @@ Vibe-Prolog implements ISO Prolog error reporting with structured error terms:
 
 Example:
 ```python
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 prolog = PrologInterpreter()
 # This will throw an instantiation error, which is caught by catch/3

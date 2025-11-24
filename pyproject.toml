@@ -30,4 +30,4 @@ python_functions = ["test_*"]
 package = true
 
 [tool.setuptools.packages.find]
-include = ["prolog*"]
+include = ["vibeprolog*"]
