@@ -416,10 +416,10 @@ class PrologParser:
                 depth = 1
                 i += 2
                 while i < len(text) and depth > 0:
-                    if text[i:i+2] == '/*':
+                    if text.startswith('/*', i):
                         depth += 1
                         i += 2
-                    elif text[i:i+2] == '*/':
+                    elif text.startswith('*/', i):
                         depth -= 1
                         i += 2
                     else:

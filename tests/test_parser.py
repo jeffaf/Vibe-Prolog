@@ -402,7 +402,7 @@ class TestComments:
     def test_unterminated_block_comment(self):
         """Test unterminated block comment raises error."""
         parser = PrologParser()
-        with pytest.raises(Exception):  # Should raise syntax_error
+        with pytest.raises(PrologThrow, match="Unterminated block comment"):
             parser.parse("/* unterminated parent(john, mary).")
 
     def test_block_comment_with_newlines(self):
