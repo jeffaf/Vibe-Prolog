@@ -124,7 +124,7 @@ The current `write_term_to_chars/3` implementation has these limitations:
 
 Use `compliance/iso-tests-simple.pl` to verify basic functionality:
 ```bash
-uv run python vibeprolog.py compliance/iso-tests-simple.pl -q "run_all_tests_manual"
+uv run vibeprolog.py compliance/iso-tests-simple.pl -q "run_all_tests_manual"
 ```
 
 ### Future Approach
