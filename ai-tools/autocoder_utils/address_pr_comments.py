@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Sequence
+
+from . import (
+    check_commands_available,
+    ensure_env,
+    get_owner_repo,
+    get_repo_root,
+    has_staged_changes,
+    run,
+    stage_changes,
+)
+
+
+def _argv_or_sys(argv: Sequence[str] | None) -> Sequence[str]:
+    return argv if argv is not None else sys.argv
+
+
+def get_pr_info(owner: str, repo: str, pr_number: str) -> dict:
+    """
+    Check that the PR exists and return basic info, including headRefName.
+    """
+    json_output = run(
+        [
+            "gh",
+            "pr",
+            "view",
+            pr_number,
+            "--repo",
+            f"{owner}/{repo}",
+            "--json",
+            "number,headRefName",
+        ]
+    )
+    try:
+        data = json.loads(json_output)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Failed to parse JSON from gh output: {exc}\nRaw output:\n{json_output}")
+    if not isinstance(data, dict):
+        raise SystemExit(f"Unexpected JSON type from gh: {type(data)}")
+    return data
+
+
+def checkout_pr_branch(branch_name: str) -> None:
+    """
+    Switch to the branch the PR is for.
+
+    If the branch does not exist locally, attempt to create it tracking origin.
+    """
+    try:
+        run(["git", "checkout", branch_name], capture_output=False)
+        return
+    except SystemExit:
+        # Try creating the branch from origin/<branch_name>
+        run(["git", "checkout", "-b", branch_name, f"origin/{branch_name}"], capture_output=False)
+
+
+def ensure_gh_pr_helper(repo_root: Path) -> Path:
+    helper_path = repo_root / "ai-tools" / "gh-pr-helper" / "gh-pr-helper"
+    if not helper_path.is_file():
+        raise SystemExit(f"Unable to locate gh-pr-helper at {helper_path}")
+    if not os.access(helper_path, os.X_OK):
+        raise SystemExit(f"gh-pr-helper is not executable: {helper_path}")
+    return helper_path
+
+
+def get_gh_pr_output(helper_path: Path, owner: str, repo: str, pr_number: str) -> str:
+    return run(
+        [
+            str(helper_path),
+            "--owner",
+            owner,
+            "--repo",
+            repo,
+            "--pr",
+            pr_number,
+        ]
+    )
+
+
+def build_changes_to_make(pr_output: str) -> str:
+    prompt = (
+        "Read the PR comments below and generate precise instructions to address them. "
+        "We only want to include things that we want to fix, so be sure to remove comments have been marked as resolved or are made redundant by subsequent updates. "
+        "Include the diff blocks and line numbers. Format as Markdown"
+    )
+    return run(["llm", "-s", prompt], input_text=pr_output)
+
+
+def run_kilocode_with_changes(changes_to_make: str) -> None:
+    run(["kilocode", "--auto"], input_text=changes_to_make, capture_output=False)
+
+
+def create_commit_from_pr_output(pr_output: str) -> None:
+    if not has_staged_changes():
+        print("No changes to commit.")
+        return
+
+    commit_message = run(
+        [
+            "llm",
+            "--extract",
+            "-s",
+            "give me a git commit message for changes that address these review comments",
+        ],
+        input_text=pr_output,
+    ).strip()
+    if not commit_message:
+        commit_message = "Address review comments"
+    run(["git", "commit", "-m", commit_message], capture_output=False)
+
+
+def push_current_branch() -> None:
+    run(["git", "push"], capture_output=False)
+
+
+def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
+    check_commands_available(["kilocode", "gh", "llm"])
+    ensure_env()
+
+    args = _argv_or_sys(argv)
+    if len(args) < 2 or args[1] in {"-h", "--help"}:
+        print(f"Usage: {args[0]} <pr-number>", file=sys.stderr)
+        raise SystemExit(1)
+
+    pr_number = args[1]
+
+    repo_root = get_repo_root()
+    os.chdir(repo_root)
+
+    owner, repo = get_owner_repo()
+    pr_info = get_pr_info(owner, repo, pr_number)
+    branch_name = str(pr_info.get("headRefName", "")).strip()
+    if not branch_name:
+        raise SystemExit(f"Unable to determine headRefName for PR #{pr_number}")
+
+    checkout_pr_branch(branch_name)
+    run(["git", "pull"], capture_output=False)
+
+    from .gh_pr_helper import fetch_pr_comments, format_comments_as_markdown
+
+    review_comments, issue_comments = fetch_pr_comments(owner, repo, pr_number)
+    pr_output = format_comments_as_markdown(
+        review_comments, issue_comments, owner, repo, pr_number
+    )
+
+    changes_to_make = build_changes_to_make(pr_output)
+    run_kilocode_with_changes(changes_to_make)
+    stage_changes()
+    create_commit_from_pr_output(pr_output)
+    push_current_branch()
