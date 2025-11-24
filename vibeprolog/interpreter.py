@@ -25,7 +25,7 @@ class PrologInterpreter:
 
     @property
     def argv(self) -> list[str]:
-        return self.engine.argv if self.engine else self._argv
+        return self._argv
 
     @argv.setter
     def argv(self, value: list[str]) -> None:

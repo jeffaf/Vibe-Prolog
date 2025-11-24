@@ -97,7 +97,7 @@ class ReflectionBuiltins:
         arg_list = deref(args[0], subst)
 
         # Convert argv to Prolog list of atoms
-        prolog_argv = python_to_list([Atom(arg) for arg in engine.argv])
+        prolog_argv = ReflectionBuiltins._get_prolog_argv(engine)
 
         return unify(arg_list, prolog_argv, subst)
 
