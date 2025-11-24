@@ -7,12 +7,11 @@ import sys
 
 from autocoder_utils.issue_workflow import IssueWorkflowConfig, run_issue_workflow
 
-
 def main(argv: list[str]) -> None:
     config = IssueWorkflowConfig(
-        tool_cmd=["kilocode", "--auto"],
-        branch_prefix="fix-kilocode",
-        default_commit_message="Update from kilocode",
+        tool_cmd=["claude"],
+        branch_prefix="fix-claude",
+        default_commit_message="Update from claude",
     )
     run_issue_workflow(argv, config)
 

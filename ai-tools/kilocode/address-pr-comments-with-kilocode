@@ -11,9 +11,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from autocoder_utils import (
     check_commands_available,
     ensure_env,
@@ -90,6 +87,7 @@ def get_gh_pr_output(helper_path: Path, owner: str, repo: str, pr_number: str) -
 def build_changes_to_make(pr_output: str) -> str:
     prompt = (
         "Read the PR comments below and generate precise instructions to address them. "
+        "We only want to include things that we want to fix, so be sure to remove comments have been marked as resolved or are made redundant by subsequent updates. "
         "Include the diff blocks and line numbers. Format as Markdown"
     )
     return run(["llm", "-s", prompt], input_text=pr_output)
