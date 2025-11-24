@@ -114,8 +114,8 @@
   - Streams goal solutions per element to preserve backtracking semantics
 
 ### System Predicates
-- ❌ `argv/1` – Access command-line arguments as list
-- ❌ `current_prolog_flag(argv, Args)` – ISO-style access to command-line arguments
+- ✅ `argv/1` – Access command-line arguments as list
+- ✅ `current_prolog_flag(argv, Args)` – ISO-style access to command-line arguments
 
 ## Directives (ISO 7.4)
 

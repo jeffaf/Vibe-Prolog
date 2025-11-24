@@ -192,12 +192,21 @@ Examples:
 
   # Verbose mode
   %(prog)s examples.pl -q "parent(X, Y)" -v
+
+  # Pass arguments to Prolog program
+  %(prog)s program.pl arg1 arg2 arg3
         """
     )
 
     parser.add_argument(
         'file',
         help='Prolog program file to load (.pl)'
+    )
+
+    parser.add_argument(
+        'program_args',
+        nargs='*',
+        help='Arguments to pass to the Prolog program'
     )
 
     parser.add_argument(
@@ -233,7 +242,7 @@ Examples:
     args = parser.parse_args()
 
     # Create interpreter
-    prolog = PrologInterpreter()
+    prolog = PrologInterpreter(argv=args.program_args)
 
     # Load the program
     if not load_program(prolog, args.file, args.verbose):

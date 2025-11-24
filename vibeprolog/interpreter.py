@@ -17,10 +17,21 @@ from vibeprolog.unification import apply_substitution
 class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
-    def __init__(self):
+    def __init__(self, argv: list[str] | None = None) -> None:
         self.parser = PrologParser()
         self.clauses = []
+        self._argv: list[str] = argv or []
         self.engine = None
+
+    @property
+    def argv(self) -> list[str]:
+        return self._argv
+
+    @argv.setter
+    def argv(self, value: list[str]) -> None:
+        self._argv = value
+        if self.engine is not None:
+            self.engine.argv = value
 
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
@@ -33,7 +44,7 @@ class PrologInterpreter:
         except (ValueError, LarkError) as exc:
             raise_syntax_error("consult/1", exc)
         self.clauses.extend(clauses)
-        self.engine = PrologEngine(self.clauses)
+        self.engine = PrologEngine(self.clauses, self.argv)
 
     def consult_string(self, prolog_code: str):
         """Load Prolog clauses from a string."""
@@ -42,7 +53,7 @@ class PrologInterpreter:
         except (ValueError, LarkError) as exc:
             raise_syntax_error("consult/1", exc)
         self.clauses.extend(clauses)
-        self.engine = PrologEngine(self.clauses)
+        self.engine = PrologEngine(self.clauses, self.argv)
 
     def query(
         self, query_str: str, limit: int | None = None, capture_output: bool = False
@@ -61,7 +72,7 @@ class PrologInterpreter:
         """
         if self.engine is None:
             # Initialize empty engine for built-in predicates
-            self.engine = PrologEngine(self.clauses)
+            self.engine = PrologEngine(self.clauses, self.argv)
 
         # Parse the query
         goals = self._parse_query(query_str)

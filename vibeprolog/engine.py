@@ -26,8 +26,9 @@ class CutException(Exception):
 class PrologEngine:
     """Prolog inference engine."""
 
-    def __init__(self, clauses: list[Clause]):
+    def __init__(self, clauses: list[Clause], argv: list[str] | None = None):
         self.clauses = clauses
+        self.argv = argv or []
         self.call_depth = 0
         self.max_depth = 1000  # Prevent infinite recursion
         self._fresh_var_counter = 0
