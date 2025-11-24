@@ -3,19 +3,8 @@
 # /// script
 # requires-python = ">=3.12"
 # ///
-import sys
-
-from autocoder_utils.issue_workflow import IssueWorkflowConfig, run_issue_workflow
-
-
-def main(argv: list[str]) -> None:
-    config = IssueWorkflowConfig(
-        tool_cmd=["kilocode", "--auto"],
-        branch_prefix="fix-kilocode",
-        default_commit_message="Update from kilocode",
-    )
-    run_issue_workflow(argv, config)
+from autocoder_utils.cli import fix_issue_with_kilocode
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    fix_issue_with_kilocode()

@@ -3,18 +3,8 @@
 # /// script
 # requires-python = ">=3.12"
 # ///
-import sys
-
-from autocoder_utils.issue_workflow import IssueWorkflowConfig, run_issue_workflow
-
-def main(argv: list[str]) -> None:
-    config = IssueWorkflowConfig(
-        tool_cmd=["claude"],
-        branch_prefix="fix-claude",
-        default_commit_message="Update from claude",
-    )
-    run_issue_workflow(argv, config)
+from autocoder_utils.cli import fix_issue_with_claude
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    fix_issue_with_claude()

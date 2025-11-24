@@ -6,6 +6,13 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.scripts]
+fix-issue-with-kilocode = "autocoder_utils.cli:fix_issue_with_kilocode"
+address-pr-comments-with-kilocode = "autocoder_utils.cli:address_pr_comments_with_kilocode"
+fix-issue-with-claude = "autocoder_utils.cli:fix_issue_with_claude"
+generate-changelog = "autocoder_utils.cli:generate_changelog"
+gh-pr-helper = "autocoder_utils.cli:gh_pr_helper"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
