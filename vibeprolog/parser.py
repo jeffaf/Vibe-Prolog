@@ -415,20 +415,7 @@ class PrologParser:
         in_double_quote = False
         escape_next = False
         while i < len(text):
-            char = text[i]
-            if escape_next:
-                escape_next = False
-                result.append(char)
-            elif char == '\\':
-                escape_next = True
-                result.append(char)
-            elif char == "'" and not in_double_quote:
-                in_single_quote = not in_single_quote
-                result.append(char)
-            elif char == '"' and not in_single_quote:
-                in_double_quote = not in_double_quote
-                result.append(char)
-            elif not in_single_quote and not in_double_quote and text.startswith('/*', i):
+            if not in_single_quote and not in_double_quote and text.startswith('/*', i):
                 depth = 1
                 i += 2
                 while i < len(text) and depth > 0:
@@ -443,8 +430,19 @@ class PrologParser:
                 if depth > 0:
                     raise ValueError("Unterminated block comment")
                 continue  # Skip the comment
-            else:
-                result.append(char)
+
+            char = text[i]
+            result.append(char)
+
+            if escape_next:
+                escape_next = False
+            elif char == '\\':
+                escape_next = True
+            elif char == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+
             i += 1
         return ''.join(result)
 

@@ -419,6 +419,14 @@ class TestComments:
         assert len(clauses) == 1
         assert clauses[0].head.functor == "parent"
 
+    def test_block_comment_in_string(self):
+        parser = PrologParser()
+        clauses = parser.parse("write('/* not comment */').")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "write"
+        # Further assert the atom argument contains '/* not comment */'
+        assert clauses[0].head.args[0].name == "/* not comment */"
+
 
 class TestStrings:
     """Tests for parsing strings."""
