@@ -1,23 +1,50 @@
-#!/usr/bin/env -S uv run --script
-#
-# /// script
-# requires-python = ">=3.12"
-# ///
+from __future__ import annotations
+
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from autocoder_utils import (
+from . import (
     check_commands_available,
     ensure_env,
     has_staged_changes,
     run,
     stage_changes,
 )
+
+
+@dataclass(frozen=True)
+class IssueWorkflowConfig:
+    """Configuration for running the fix-issue workflow with a specific tool."""
+
+    tool_cmd: Sequence[str]
+    branch_prefix: str
+    default_commit_message: str
+    branch_suffix: str = "-"
+    required_commands: Sequence[str] | None = None
+    pr_model: str = "gpt-5-nano"
+
+    def required_cmds(self) -> list[str]:
+        """Commands that must be present before executing the workflow."""
+        base = ["gh", "llm"]
+        extra = list(self.required_commands) if self.required_commands is not None else []
+        if not extra and self.tool_cmd:
+            extra.append(self.tool_cmd[0])
+        commands: list[str] = []
+        for cmd in [*extra, *base]:
+            if cmd and cmd not in commands:
+                commands.append(cmd)
+        return commands
+
+    def branch_requirement(self, issue_number: str) -> str:
+        """Full prefix text enforced for generated branch names."""
+        return f"{self.branch_prefix}/{issue_number}{self.branch_suffix}"
+
+    def branch_prefix_token(self, issue_number: str) -> str:
+        """Substring that must appear in the branch name."""
+        return f"{self.branch_prefix}/{issue_number}"
 
 
 def get_issue_content(issue_number: str) -> str:
@@ -45,22 +72,18 @@ def get_issue_content(issue_number: str) -> str:
     )
 
 
-def create_branch_name(issue_number: str, issue_content: str) -> str:
+def create_branch_name(issue_number: str, issue_content: str, config: IssueWorkflowConfig) -> str:
     prompt = (
         "create a good git branch title for a branch that addresses this issue. "
-        f"It should start with `fix-claude/{issue_number}-` and must be a valid branch name"
+        f"It should start with `{config.branch_requirement(issue_number)}` and must be a valid branch name"
     )
-    # Mirror the shell script: feed issue content on stdin, give the instruction
-    # as the prompt argument to `llm`.
     raw_output = run(["llm", prompt], input_text=issue_content).strip()
-
-    # Be defensive: some llm configurations may return explanatory text.
-    # Prefer the first line that contains the required prefix, otherwise
-    # fall back to the first non-empty line.
     lines = [line.strip() for line in raw_output.splitlines() if line.strip()]
+
     temp_branch_name = ""
+    required_token = config.branch_prefix_token(issue_number)
     for line in lines:
-        if f"fix-claude/{issue_number}" in line:
+        if required_token in line:
             temp_branch_name = line
             break
     if not temp_branch_name and lines:
@@ -68,16 +91,15 @@ def create_branch_name(issue_number: str, issue_content: str) -> str:
     if not temp_branch_name:
         raise SystemExit(f"llm did not return a usable branch name: {raw_output!r}")
 
-    # Normalise and validate like `git check-ref-format --normalize`
     normalized = run(["git", "check-ref-format", "--normalize", temp_branch_name]).strip()
     return normalized
 
 
-def run_claude(issue_content: str) -> None:
-    run(["claude"], input_text=issue_content, capture_output=False)
+def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
+    run(list(config.tool_cmd), input_text=issue_content, capture_output=False)
 
 
-def create_commit_if_needed() -> None:
+def create_commit_if_needed(default_message: str) -> None:
     if not has_staged_changes():
         print("No changes to commit.")
         return
@@ -88,7 +110,7 @@ def create_commit_if_needed() -> None:
         input_text=diff,
     ).strip()
     if not commit_message:
-        commit_message = "Update from claude"
+        commit_message = default_message
     run(["git", "commit", "-m", commit_message], capture_output=False)
 
 
@@ -96,35 +118,34 @@ def push_branch(branch_name: str) -> None:
     run(["git", "push", "--set-upstream", "origin", branch_name], capture_output=False)
 
 
-def build_pr_title_body(issue_number: str) -> dict[str, Any]:
+def build_pr_title_body(issue_number: str, model: str) -> dict[str, Any]:
     git_log_output = run(["git", "log", "origin/main.."])
     prompt = (
         "Looking at this git log output, summarise into a `title` and `body` suitable for a pull request. "
         f"The `body` MUST start with `Closes #{issue_number}`"
     )
-    # Force the model that understands `--schema`
     pr_title_body_json = run(
         [
             "llm",
             "--schema",
             "title,body",
             "-m",
-            "gpt-5-nano",
+            model,
             prompt,
         ],
         input_text=git_log_output,
     )
     try:
         data = json.loads(pr_title_body_json)
-    except json.JSONDecodeError as e:
-        raise SystemExit(f"Failed to parse JSON from llm output: {e}\nRaw output:\n{pr_title_body_json}")
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Failed to parse JSON from llm output: {exc}\nRaw output:\n{pr_title_body_json}")
     if not isinstance(data, dict):
         raise SystemExit(f"Unexpected JSON type from llm: {type(data)}")
     return data
 
 
-def create_pr(issue_number: str) -> None:
-    pr_data = build_pr_title_body(issue_number)
+def create_pr(issue_number: str, model: str) -> None:
+    pr_data = build_pr_title_body(issue_number, model)
     title = str(pr_data.get("title", "")).strip()
     body = str(pr_data.get("body", "")).strip()
     run(
@@ -141,27 +162,26 @@ def create_pr(issue_number: str) -> None:
     )
 
 
-def main(argv: list[str]) -> None:
-    check_commands_available(["claude", "gh", "llm"])
+def parse_issue_number(argv: Sequence[str]) -> str:
+    if len(argv) < 2 or argv[1] in {"-h", "--help"}:
+        script_name = Path(argv[0]).name if argv else "fix-issue"
+        print(f"Usage: {script_name} <issue-number>", file=sys.stderr)
+        raise SystemExit(1)
+    return argv[1]
+
+
+def run_issue_workflow(argv: Sequence[str], config: IssueWorkflowConfig) -> None:
+    check_commands_available(config.required_cmds())
     ensure_env()
 
-    if len(argv) < 2 or argv[1] in {"-h", "--help"}:
-        print(f"Usage: {argv[0]} <issue-number>", file=sys.stderr)
-        raise SystemExit(1)
-
-    issue_number = argv[1]
-
+    issue_number = parse_issue_number(argv)
     issue_content = get_issue_content(issue_number)
 
-    branch_name = create_branch_name(issue_number, issue_content)
+    branch_name = create_branch_name(issue_number, issue_content, config)
     run(["git", "checkout", "-b", branch_name], capture_output=False)
 
-    run_claude(issue_content)
+    run_tool(issue_content, config)
     stage_changes()
-    create_commit_if_needed()
+    create_commit_if_needed(config.default_commit_message)
     push_branch(branch_name)
-    create_pr(issue_number)
-
-
-if __name__ == "__main__":
-    main(sys.argv)
+    create_pr(issue_number, config.pr_model)
