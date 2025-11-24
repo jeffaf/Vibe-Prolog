@@ -34,7 +34,7 @@ that document to understand missing directives, error terms, and parser gaps.
 ### Running the Demo
 
 ```bash
-uv run main.py
+uv run vibeprolog.py
 ```
 
 ### Running Tests
