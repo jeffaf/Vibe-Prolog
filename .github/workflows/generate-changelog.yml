@@ -30,7 +30,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          python ai-tools/kilocode/change-tracker/generate-changelog.py
+          python ai-tools/change-tracker/generate-changelog.py
 
       - name: Get current date
         id: date

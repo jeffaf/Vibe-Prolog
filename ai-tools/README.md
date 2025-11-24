@@ -7,6 +7,7 @@ like `gh`, `llm`, `kilocode`, and `claude`, and can be run via `uv` or as an exe
 ## Layout
 
 - `autocoder_utils/`: Shared Python helpers used by the Kilocode/Claude flows.
+- `change-tracker/`: Git changelog generator used by the scheduled workflow.
 - `gh-pr-helper/`: Standalone formatter that fetches and prints PR review comments.
 - `kilocode/`: Scripts that orchestrate Kilocode/Claude along with git and GitHub.
 
@@ -44,6 +45,16 @@ uv run ai-tools/kilocode/fix-issue-with-claude 789
 
 Each script also has an executable shebang, so you may invoke them directly via
 `./ai-tools/...` if you prefer.
+
+## Change tracker
+
+`ai-tools/change-tracker/generate-changelog.py` walks git history, computes stats,
+and writes daily markdown changelog entries under `changes/`. It is used by the
+`generate-changelog.yml` GitHub Action but may also be run manually:
+
+```bash
+python ai-tools/change-tracker/generate-changelog.py
+```
 
 ## Kilocode tools
 
