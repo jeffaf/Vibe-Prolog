@@ -99,6 +99,8 @@ class ControlBuiltins:
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         goal = deref(args[0], subst)
+        # Check if the predicate exists before calling it
+        engine._check_predicate_exists(goal, "call/1")
         yield from engine._solve_goals([goal], subst)
 
     @staticmethod

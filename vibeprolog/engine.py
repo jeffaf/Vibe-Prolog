@@ -318,6 +318,64 @@ class PrologEngine:
             error_term = PrologError.domain_error(domain_name, value, predicate)
             raise PrologThrow(error_term)
 
+    def _predicate_exists(self, goal: Compound | Atom) -> bool:
+        """Check if a predicate exists (either as builtin or user-defined).
+
+        Args:
+            goal: The goal to check (Compound or Atom)
+
+        Returns:
+            True if the predicate exists, False otherwise
+        """
+        key: tuple[str, int] | None = None
+
+        if isinstance(goal, Compound):
+            key = (goal.functor, len(goal.args))
+        elif isinstance(goal, Atom):
+            key = (goal.name, 0)
+        else:
+            return False
+
+        # Check if it's a builtin
+        if key in self._builtin_registry:
+            return True
+
+        # Check if there are any user-defined clauses for this predicate
+        functor, arity = key
+        for clause in self.clauses:
+            head = clause.head
+            if isinstance(head, Compound):
+                if head.functor == functor and len(head.args) == arity:
+                    return True
+            elif isinstance(head, Atom):
+                if head.name == functor and arity == 0:
+                    return True
+
+        return False
+
+    def _check_predicate_exists(self, goal: Compound | Atom, context: str) -> None:
+        """Raise existence_error if predicate doesn't exist.
+
+        Args:
+            goal: The goal to check (Compound or Atom)
+            context: Name of the calling predicate (e.g., 'call/1')
+
+        Raises:
+            PrologThrow with existence_error term
+        """
+        if not self._predicate_exists(goal):
+            # Create the procedure indicator (functor/arity)
+            if isinstance(goal, Compound):
+                indicator = Compound("/", (Atom(goal.functor), Number(len(goal.args))))
+            elif isinstance(goal, Atom):
+                indicator = Compound("/", (Atom(goal.name), Number(0)))
+            else:
+                # For non-callable terms, still raise an error
+                indicator = goal
+
+            error_term = PrologError.existence_error("procedure", indicator, context)
+            raise PrologThrow(error_term)
+
 
 __all__ = [
     "PrologEngine",
