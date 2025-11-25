@@ -123,22 +123,51 @@ class TestExistenceError:
         assert result is None
 
     def test_call_with_variable_unbound(self):
-        """Test that call/1 with unbound variable raises existence_error.
+        """Test that call/1 with unbound variable raises instantiation_error.
 
-        Since an unbound variable represents an undefined predicate, it should raise
-        existence_error. In this implementation, we check for predicate existence
-        which includes checking if the goal is callable.
+        According to ISO standard, call/1 should check for instantiation errors
+        before checking for existence errors.
         """
         prolog = PrologInterpreter()
 
-        # Try to call an unbound variable - should raise existence_error
+        # Try to call an unbound variable - should raise instantiation_error
         result = prolog.query_once("catch(call(X), Error, true)")
         assert result is not None
 
         error = result.get('Error')
-        # For unbound variables, we expect existence_error
+        # For unbound variables, we expect instantiation_error
         assert isinstance(error, dict)
         assert 'error' in error
+        error_parts = error['error']
+        assert isinstance(error_parts, list)
+        # Check that it's an instantiation_error
+        error_type = error_parts[0]
+        assert error_type == "instantiation_error"
+
+    def test_call_with_non_callable(self):
+        """Test that call/1 with non-callable term raises type_error.
+
+        According to ISO standard, call/1 should raise type_error(callable, Culprit)
+        for non-callable terms like numbers or lists.
+        """
+        prolog = PrologInterpreter()
+
+        # Try to call a number - should raise type_error
+        result = prolog.query_once("catch(call(123), Error, true)")
+        assert result is not None
+
+        error = result.get('Error')
+        assert isinstance(error, dict)
+        assert 'error' in error
+        error_parts = error['error']
+        assert isinstance(error_parts, list)
+        # Check that it's a type_error
+        error_type = error_parts[0]
+        assert isinstance(error_type, dict)
+        assert 'type_error' in error_type
+        type_error_parts = error_type['type_error']
+        assert type_error_parts[0] == "callable"
+        assert type_error_parts[1] == 123
 
     def test_direct_call_to_undefined_predicate_fails(self):
         """Test that directly calling an undefined predicate just fails (no error).
