@@ -123,7 +123,7 @@
 - ❌ `:- dynamic/1` – Declare dynamic predicate
 - ❌ `:- multifile/1` – Declare multifile predicate
 - ❌ `:- discontiguous/1` – Declare discontiguous predicate
-- ❌ `:- initialization/1` – Specify initialization goal
+- ✅ `:- initialization/1` – Specify initialization goal
 
 ### Operator Directives
 - ❌ `:- op/3` – Define operator

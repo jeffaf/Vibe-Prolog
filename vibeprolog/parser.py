@@ -50,13 +50,21 @@ class Clause:
         return self.body is not None
 
 
+@dataclass
+class Directive:
+    """A Prolog directive (e.g., :- initialization(goal).)."""
+
+    goal: Any  # The directive term, e.g., initialization(goal)
+
+
 # Lark grammar for Prolog
 PROLOG_GRAMMAR = r"""
-    start: clause+
+    start: (clause | directive)+
 
     clause: fact | rule
     fact: term "."
     rule: term ":-" goals "."
+    directive: ":-" term "."
 
     goals: term ("," term)*
 
@@ -135,7 +143,7 @@ PROLOG_GRAMMAR = r"""
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
-    SPECIAL_ATOM_OPS.5: /-\$/ | /:-/
+    SPECIAL_ATOM_OPS.5: /-\$/
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
 
     VARIABLE: /[A-Z_][a-zA-Z0-9_]*/
@@ -158,6 +166,9 @@ class PrologTransformer(Transformer):
 
     def clause(self, items):
         return items[0]
+
+    def directive(self, items):
+        return Directive(goal=items[0])
 
     def fact(self, items):
         return Clause(head=items[0], body=None)
@@ -497,7 +508,7 @@ class PrologParser:
             i += 1
         return ''.join(result)
 
-    def parse(self, text: str, context: str = "parse/1") -> list[Clause]:
+    def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
             text = self._strip_block_comments(text)
