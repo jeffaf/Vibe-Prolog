@@ -618,21 +618,17 @@ class TestScientificNotation:
 class TestStandardPrefixes:
     """Tests for standard number prefixes (hex, octal, binary)."""
 
-    def test_hexadecimal_numbers(self):
+    @pytest.mark.parametrize("literal, expected", [
+        ("0xFF", 255),
+        ("0x10", 16),
+        ("0xABC", 0xABC),
+        ("-0x1A", -0x1A),
+    ])
+    def test_hexadecimal_numbers(self, literal, expected):
         parser = PrologParser()
-
-        clauses = parser.parse("num(0xFF).")
+        clauses = parser.parse(f"num({literal}).")
         assert isinstance(clauses[0].head.args[0], Number)
-        assert clauses[0].head.args[0].value == 255
-
-        clauses = parser.parse("num(0x10).")
-        assert clauses[0].head.args[0].value == 16
-
-        clauses = parser.parse("num(0xABC).")
-        assert clauses[0].head.args[0].value == 0xABC
-
-        clauses = parser.parse("num(-0x1A).")
-        assert clauses[0].head.args[0].value == -0x1A
+        assert clauses[0].head.args[0].value == expected
 
     def test_octal_numbers(self):
         parser = PrologParser()
