@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from .gh_pr_helper import fetch_pr_comments, format_comments_as_markdown
+
+
 from . import (
     check_commands_available,
     ensure_env,
@@ -119,21 +122,172 @@ def push_current_branch() -> None:
     run(["git", "push"], capture_output=False)
 
 
+def get_current_branch_name() -> str:
+    branch_name = run(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip()
+    if not branch_name or branch_name == "HEAD":
+        raise SystemExit(
+            "Unable to determine current branch. Please check out a branch or pass a PR number."
+        )
+    return branch_name
+
+
+def get_upstream_remote_branch() -> tuple[str, str]:
+    try:
+        upstream_ref = run(
+            ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"]
+        ).strip()
+    except SystemExit as exc:
+        raise SystemExit(
+            "Current branch has no upstream tracking branch. Configure an upstream or pass a PR number."
+        ) from exc
+    if "/" not in upstream_ref:
+        raise SystemExit(
+            f"Unexpected upstream ref format: {upstream_ref!r}. Please pass a PR number."
+        )
+    remote_name, remote_branch = upstream_ref.split("/", 1)
+    if not remote_name or not remote_branch:
+        raise SystemExit(
+            f"Unable to parse upstream ref {upstream_ref!r}. Please pass a PR number."
+        )
+    return remote_name, remote_branch
+
+
+def get_git_remotes() -> list[str]:
+    """Get list of configured git remotes."""
+    output = run(["git", "remote"]).strip()
+    if not output:
+        return []
+    return [line.strip() for line in output.split("\n") if line.strip()]
+
+
+def find_base_repo_remote(tracking_remote: str) -> str:
+    """
+    Find the base repository remote for PR searches.
+
+    For fork-based workflows, PRs live in the upstream repo, not the fork.
+    This function tries to find the upstream remote, falling back to the
+    tracking remote if no upstream is found.
+
+    Args:
+        tracking_remote: The remote that the current branch tracks
+
+    Returns:
+        The remote name to use for PR searches (tries "upstream" first)
+    """
+    remotes = get_git_remotes()
+
+    # For fork workflows, try "upstream" first
+    if "upstream" in remotes and tracking_remote != "upstream":
+        return "upstream"
+
+    # Fall back to the tracking remote
+    return tracking_remote
+
+
+def find_pr_number_for_branch(
+    base_owner: str,
+    base_repo: str,
+    head_owner: str,
+    branch_name: str,
+    display_branch: str,
+) -> str:
+    """
+    Find PR number by searching in the base repository for a branch from the fork.
+
+    Args:
+        base_owner: Owner of the base repository (where the PR lives)
+        base_repo: Name of the base repository (where the PR lives)
+        head_owner: Owner of the fork (whose branch has the changes)
+        branch_name: Name of the branch with changes
+        display_branch: Branch name for display in error messages
+
+    Returns:
+        PR number as string
+    """
+    head_ref = f"{head_owner}:{branch_name}"
+    json_output = run(
+        [
+            "gh",
+            "api",
+            f"/repos/{base_owner}/{base_repo}/pulls",
+            "-f",
+            "state=open",
+            "-f",
+            f"head={head_ref}",
+            "-f",
+            "per_page=50",
+        ]
+    )
+    try:
+        data = json.loads(json_output)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Failed to parse JSON from gh api output: {exc}") from exc
+    if not isinstance(data, list):
+        raise SystemExit("Unexpected response when searching for pull requests.")
+    if len(data) == 0:
+        raise SystemExit(
+            f"No open pull request found for branch {display_branch!r}. Please pass a PR number."
+        )
+    if len(data) > 1:
+        pr_numbers = [str(pr.get("number")) for pr in data if pr.get("number")]
+        pr_list = ", ".join([f"#{n}" for n in pr_numbers])
+        raise SystemExit(
+            f"Multiple open pull requests match branch {display_branch!r}: {pr_list}. Please pass a PR number."
+        )
+    pr_number = data[0].get("number")
+    if not pr_number:
+        raise SystemExit("Unable to determine PR number for the current branch.")
+    return str(pr_number)
+
+
+def resolve_pr_from_current_branch() -> tuple[str, str, str]:
+    """
+    Auto-detect PR number from current branch.
+
+    For fork-based workflows, searches in the upstream repository
+    while using the fork owner in the head ref.
+
+    Returns:
+        Tuple of (base_owner, base_repo, pr_number)
+    """
+    local_branch = get_current_branch_name()
+    tracking_remote, remote_branch = get_upstream_remote_branch()
+
+    # Get fork owner from tracking remote (only need owner for head ref)
+    fork_owner, _ = get_owner_repo(tracking_remote)
+
+    # Find base repo (tries "upstream" first for fork workflows)
+    base_remote = find_base_repo_remote(tracking_remote)
+    base_owner, base_repo = get_owner_repo(base_remote)
+
+    # Search in base repo for fork's branch
+    pr_number = find_pr_number_for_branch(
+        base_owner, base_repo, fork_owner, remote_branch, local_branch
+    )
+
+    # Return base repo since that's where the PR lives
+    return base_owner, base_repo, pr_number
+
+
 def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
     check_commands_available(["kilocode", "gh", "llm"])
     ensure_env()
 
     args = _argv_or_sys(argv)
-    if len(args) < 2 or args[1] in {"-h", "--help"}:
-        print(f"Usage: {args[0]} <pr-number>", file=sys.stderr)
+    if len(args) > 1 and args[1] in {"-h", "--help"}:
+        print(f"Usage: {args[0]} [pr-number]", file=sys.stderr)
         raise SystemExit(1)
 
-    pr_number = args[1]
+    pr_number = args[1] if len(args) > 1 else None
 
     repo_root = get_repo_root()
     os.chdir(repo_root)
 
-    owner, repo = get_owner_repo()
+    if pr_number is None:
+        owner, repo, pr_number = resolve_pr_from_current_branch()
+    else:
+        owner, repo = get_owner_repo()
+
     pr_info = get_pr_info(owner, repo, pr_number)
     branch_name = str(pr_info.get("headRefName", "")).strip()
     if not branch_name:
@@ -141,8 +295,6 @@ def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None
 
     checkout_pr_branch(branch_name)
     run(["git", "pull"], capture_output=False)
-
-    from .gh_pr_helper import fetch_pr_comments, format_comments_as_markdown
 
     review_comments, issue_comments = fetch_pr_comments(owner, repo, pr_number)
     pr_output = format_comments_as_markdown(
