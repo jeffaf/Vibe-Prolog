@@ -318,11 +318,11 @@ class PrologEngine:
             error_term = PrologError.domain_error(domain_name, value, predicate)
             raise PrologThrow(error_term)
 
-    def _predicate_exists(self, goal: Compound | Atom) -> bool:
+    def _predicate_exists(self, goal: Any) -> bool:
         """Check if a predicate exists (either as builtin or user-defined).
 
         Args:
-            goal: The goal to check (Compound or Atom)
+            goal: The goal to check (typically Compound or Atom, but accepts any term)
 
         Returns:
             True if the predicate exists, False otherwise
@@ -353,11 +353,11 @@ class PrologEngine:
 
         return False
 
-    def _check_predicate_exists(self, goal: Compound | Atom, context: str) -> None:
+    def _check_predicate_exists(self, goal: Any, context: str) -> None:
         """Raise existence_error if predicate doesn't exist.
 
         Args:
-            goal: The goal to check (Compound or Atom)
+            goal: The goal to check (typically Compound or Atom, but accepts any term)
             context: Name of the calling predicate (e.g., 'call/1')
 
         Raises:
