@@ -6,8 +6,7 @@ from pathlib import Path
 
 from lark.exceptions import LarkError
 
-from vibeprolog.errors import raise_syntax_error
-from vibeprolog.exceptions import PrologThrow
+from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.engine import CutException, PrologEngine
 from vibeprolog.parser import PrologParser
 from vibeprolog.terms import Compound, Variable
@@ -33,6 +32,14 @@ class PrologInterpreter:
         if self.engine is not None:
             self.engine.argv = value
 
+    def _raise_syntax_error(self, exc: Exception, location: str) -> None:
+        """
+        Centralized helper to convert parsing exceptions into Prolog syntax errors
+        and raise a PrologThrow with the resulting error term.
+        """
+        error_term = PrologError.syntax_error(str(exc), location)
+        raise PrologThrow(error_term)
+
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
         filepath = Path(filepath)
@@ -42,7 +49,8 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(content, "consult/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("consult/1", exc)
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses, self.argv)
 
@@ -51,7 +59,8 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "consult/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("consult/1", exc)
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses, self.argv)
 
@@ -155,7 +164,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("query/1", exc)
+            self._raise_syntax_error(exc, "query/1")
 
         if clauses and clauses[0].body:
             # Flatten conjunction into list of goals
@@ -166,7 +175,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("query/1", exc)
+            self._raise_syntax_error(exc, "query/1")
         if clauses:
             return [clauses[0].head]
 
