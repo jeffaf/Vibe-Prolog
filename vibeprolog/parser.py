@@ -355,26 +355,25 @@ class PrologTransformer(Transformer):
 
         # Split by '
         parts = value.split("'", 1)
-        if len(parts) != 2:
-            raise ValueError(f"Invalid base'digits syntax: {value}")
-
         base_str, digits_str = parts
-        # Base is guaranteed to be digits by the grammar; a direct int() is sufficient
+        # Base must be a valid integer; token regex guarantees digits for base
         base = int(base_str)
         if not (2 <= base <= 36):
             raise ValueError(f"Base must be between 2 and 36, got {base}")
 
         # Remove underscores from digits
         digits_clean = digits_str.replace('_', '')
+
         if not digits_clean:
             raise ValueError(f"Empty digits in {value}")
 
-        # Accumulate value in the given base
+        # Validate and accumulate value
         result = 0
         for digit in digits_clean.lower():
-            digit_val = int(digit, 36)  # 0-9 -> 0-9, a-z -> 10-35
+            # Convert single digit in base up to 36
+            digit_val = int(digit, 36)
             if digit_val >= base:
-                raise ValueError(f"Digit '{digit}' out of range for base {base} in {value}")
+                raise ValueError(f"Invalid digit '{digit}' for base {base} in {value}")
             result = result * base + digit_val
 
         if negative:
