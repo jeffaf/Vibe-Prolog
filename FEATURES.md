@@ -149,7 +149,9 @@
 ### Number Literals
 - ✅ Decimal integers
 - ✅ Binary (`0b`), octal (`0o`), hexadecimal (`0x`)
+- ✅ Case-insensitive binary/octal/hex prefixes
 - ✅ Scientific notation
+- ✅ Leading-dot and trailing-zero floats
 - ✅ Floating point
 - ✅ Base-qualified numbers (`16'ff`, `2'abcd` - base'digits syntax)
 
