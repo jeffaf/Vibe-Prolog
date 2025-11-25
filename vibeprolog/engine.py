@@ -33,6 +33,8 @@ class PrologEngine:
         self.max_depth = 1000  # Prevent infinite recursion
         self._fresh_var_counter = 0
         self._builtin_registry = self._build_builtin_registry()
+        # Index of user-defined predicates for O(1) existence checks
+        self._predicate_index: set[tuple[str, int]] = self._build_predicate_index()
 
     # Compatibility wrappers retained for tests and external callers.
     def _list_to_python(
@@ -169,6 +171,21 @@ class PrologEngine:
             module.register(registry, self)
 
         return registry
+
+    def _build_predicate_index(self) -> set[tuple[str, int]]:
+        """Build an index of all user-defined predicates for fast existence checks.
+
+        Returns:
+            Set of (functor, arity) tuples for all defined predicates
+        """
+        index: set[tuple[str, int]] = set()
+        for clause in self.clauses:
+            head = clause.head
+            if isinstance(head, Compound):
+                index.add((head.functor, len(head.args)))
+            elif isinstance(head, Atom):
+                index.add((head.name, 0))
+        return index
 
     def _register_builtin(
         self, functor: str, arity: int, registry: BuiltinRegistry, handler: Callable
@@ -336,22 +353,8 @@ class PrologEngine:
         else:
             return False
 
-        # Check if it's a builtin
-        if key in self._builtin_registry:
-            return True
-
-        # Check if there are any user-defined clauses for this predicate
-        functor, arity = key
-        for clause in self.clauses:
-            head = clause.head
-            if isinstance(head, Compound):
-                if head.functor == functor and len(head.args) == arity:
-                    return True
-            elif isinstance(head, Atom):
-                if head.name == functor and arity == 0:
-                    return True
-
-        return False
+        # Check if it's a builtin or user-defined predicate (O(1) lookup)
+        return key in self._builtin_registry or key in self._predicate_index
 
     def _check_predicate_exists(self, goal: Any, context: str) -> None:
         """Raise existence_error if predicate doesn't exist.
@@ -375,6 +378,38 @@ class PrologEngine:
 
             error_term = PrologError.existence_error("procedure", indicator, context)
             raise PrologThrow(error_term)
+
+    def _add_predicate_to_index(self, clause: Clause) -> None:
+        """Add a predicate to the index after asserting a clause.
+
+        Args:
+            clause: The clause being added
+        """
+        head = clause.head
+        if isinstance(head, Compound):
+            self._predicate_index.add((head.functor, len(head.args)))
+        elif isinstance(head, Atom):
+            self._predicate_index.add((head.name, 0))
+
+    def _remove_predicate_from_index_if_empty(self, functor: str, arity: int) -> None:
+        """Remove a predicate from the index if no clauses remain for it.
+
+        Args:
+            functor: The predicate functor name
+            arity: The predicate arity
+        """
+        # Check if any clauses still exist for this predicate
+        for clause in self.clauses:
+            head = clause.head
+            if isinstance(head, Compound):
+                if head.functor == functor and len(head.args) == arity:
+                    return  # Still has clauses, don't remove from index
+            elif isinstance(head, Atom):
+                if head.name == functor and arity == 0:
+                    return  # Still has clauses, don't remove from index
+
+        # No clauses remain, remove from index
+        self._predicate_index.discard((functor, arity))
 
 
 __all__ = [
