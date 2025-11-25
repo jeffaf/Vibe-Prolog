@@ -121,7 +121,7 @@ PROLOG_GRAMMAR = r"""
 
     // Character codes: 0'X where X is any character (must come before NUMBER)
     // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex)
-    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'])/ | /\d+'.'/
+    CHAR_CODE.5: /0'(\\x[0-9a-fA-F]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'\\])/ | /\d+'.'/
 
     // Scientific notation, hex, octal, binary, base'digits
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
@@ -410,7 +410,7 @@ class PrologTransformer(Transformer):
             # Handle backslash escape sequences
             if char_part.startswith("\\"):
                 if char_part.startswith("\\x"):
-                    match = re.fullmatch(r"\\x([0-9a-zA-Z]*)\\?", char_part)
+                    match = re.fullmatch(r"\\x([0-9a-fA-F]*)\\?", char_part)
                     if not match:
                         raise ValueError("unexpected_char")
 
