@@ -32,6 +32,14 @@ class PrologInterpreter:
         if self.engine is not None:
             self.engine.argv = value
 
+    def _raise_syntax_error(self, exc: Exception, location: str) -> None:
+        """
+        Centralized helper to convert parsing exceptions into Prolog syntax errors
+        and raise a PrologThrow with the resulting error term.
+        """
+        error_term = PrologError.syntax_error(str(exc), location)
+        raise PrologThrow(error_term)
+
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
         filepath = Path(filepath)
@@ -156,8 +164,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
-            error_term = PrologError.syntax_error(str(exc), "query/1")
-            raise PrologThrow(error_term)
+            self._raise_syntax_error(exc, "query/1")
 
         if clauses and clauses[0].body:
             # Flatten conjunction into list of goals
@@ -168,8 +175,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
-            error_term = PrologError.syntax_error(str(exc), "query/1")
-            raise PrologThrow(error_term)
+            self._raise_syntax_error(exc, "query/1")
         if clauses:
             return [clauses[0].head]
 
