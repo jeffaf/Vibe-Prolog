@@ -26,7 +26,7 @@ Be sure to include the following in each issue
 - include comprehensive test coverage
 - update FEATURES.md
 
-Don't include estimates or lines numbers
+Don't include estimates or line numbers
 ```
 
 ## Prioritise work
@@ -45,7 +45,11 @@ These use my `paige-manage-github` CLI which isn't in this project.
 
 `next_issue="$(uv run --project ../paige-github-tooling paige-manage-github --next-issue)"`
 
-`uv tool run --from ./ai-tools fix-issue-with-kilocode "$next_issue"` 
+# Using kilocode
+uv tool run --from ./ai-tools fix-issue-with-kilocode "$next_issue"
+
+# Using Claude
+uv tool run --from ./ai-tools fix-issue-with-claude "$next_issue"
 
 ## Address PR review
 
