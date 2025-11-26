@@ -9,7 +9,9 @@ like `gh`, `llm`, `kilocode`, and `claude`, and can be run via `uv` or as an exe
 - `autocoder_utils/`: Shared Python helpers used by the Kilocode/Claude flows.
 - `change-tracker/`: Git changelog generator used by the scheduled workflow.
 - `gh-pr-helper/`: Standalone formatter that fetches and prints PR review comments.
-- `kilocode/`: Scripts that orchestrate Kilocode/Claude along with git and GitHub.
+- `kilocode/`: Scripts that orchestrate Kilocode workflows along with git and GitHub.
+- `claude/`: Executable shims for running the Claude workflows.
+- `codex/`: Executable shims for the Codex workflows.
 
 ## Requirements
 
@@ -21,6 +23,7 @@ Install the following CLIs and ensure they are available on `PATH`:
 - `llm`
 - `kilocode` (Kilocode automation)
 - `claude` (Claude automation)
+- `codex` (ChatGPT Codex CLI)
 
 Environment variables:
 
@@ -41,6 +44,9 @@ There are two ways to invoke the tools:
    uv tool run --from ./ai-tools fix-issue-with-kilocode 123
    uv tool run --from ./ai-tools address-pr-comments-with-kilocode 456
    uv tool run --from ./ai-tools fix-issue-with-claude 789
+   uv tool run --from ./ai-tools address-pr-comments-with-claude 1011
+   uv tool run --from ./ai-tools fix-issue-with-codex 1213
+   uv tool run --from ./ai-tools address-pr-comments-with-codex 1415
    uv tool run --from ./ai-tools gh-pr-helper owner/repo/pull/42
    uv tool run --from ./ai-tools generate-changelog
    ```
@@ -67,6 +73,9 @@ can resolve, so the preferred workflow is:
 uv tool run --from ./ai-tools fix-issue-with-kilocode 123
 uv tool run --from ./ai-tools address-pr-comments-with-kilocode 456
 uv tool run --from ./ai-tools fix-issue-with-claude 789
+uv tool run --from ./ai-tools address-pr-comments-with-claude 1011
+uv tool run --from ./ai-tools fix-issue-with-codex 1213
+uv tool run --from ./ai-tools address-pr-comments-with-codex 1415
 uv tool run --from ./ai-tools gh-pr-helper owner/repo/pull/42
 uv tool run --from ./ai-tools generate-changelog
 ```
@@ -128,4 +137,42 @@ Usage:
 
 ```bash
 uv tool run --from ./ai-tools fix-issue-with-claude 123
+```
+
+### `address-pr-comments-with-claude`
+
+Runs the PR comment workflow but drives the Claude headless CLI. It reads PR
+feedback, prepares condensed instructions, passes them to Claude, stages and
+commits updates, and pushes them upstream.
+
+Usage:
+
+```bash
+uv tool run --from ./ai-tools address-pr-comments-with-claude 456
+```
+
+## Codex tools
+
+### `fix-issue-with-codex`
+
+Behaves like the Claude issue workflow but uses `codex exec` in headless mode
+(`--full-auto --sandbox danger-full-access`). Issue content is piped to Codex so
+it can read the description, make edits, run tests, and summarize.
+
+Usage:
+
+```bash
+uv tool run --from ./ai-tools fix-issue-with-codex 123
+```
+
+### `address-pr-comments-with-codex`
+
+Mirrors the Claude PR comment flow while driving Codex. Review feedback is
+condensed into precise instructions that Codex consumes via stdin before making
+changes, staging, committing, and pushing updates.
+
+Usage:
+
+```bash
+uv tool run --from ./ai-tools address-pr-comments-with-codex 456
 ```

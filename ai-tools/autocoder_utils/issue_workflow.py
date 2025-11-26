@@ -31,6 +31,7 @@ class IssueWorkflowConfig:
     timeout_seconds: int | None = None
     session_dir: Path | None = None
     use_json_output: bool = False
+    input_instruction: str | None = None
 
     def required_cmds(self) -> list[str]:
         """Commands that must be present before executing the workflow."""
@@ -288,11 +289,14 @@ def run_issue_workflow(argv: Sequence[str], config: IssueWorkflowConfig) -> None
 
     issue_number = parse_issue_number(argv)
     issue_content = get_issue_content(issue_number)
+    tool_input = issue_content
+    if config.input_instruction:
+        tool_input = f"{config.input_instruction}\n\n{issue_content}"
 
     branch_name = create_branch_name(issue_number, issue_content, config)
     run(["git", "checkout", "-b", branch_name], capture_output=False)
 
-    run_tool(issue_content, config)
+    run_tool(tool_input, config)
     stage_changes()
     create_commit_if_needed(config.default_commit_message)
     push_branch(branch_name)
