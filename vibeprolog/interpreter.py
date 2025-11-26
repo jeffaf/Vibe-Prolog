@@ -113,6 +113,9 @@ class PrologInterpreter:
         except CutException:
             # Cut can bubble up after yielding committed results; treat it as end-of-search
             pass
+        except PrologThrow:
+            # Uncaught throw causes query to fail (no solutions)
+            pass
         finally:
             if capture_output:
                 sys.stdout = old_stdout
