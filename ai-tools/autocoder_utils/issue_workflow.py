@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import time
@@ -195,7 +196,6 @@ def extract_session_id_from_output(stdout: str, stderr: str) -> str | None:
             pass
 
     # Look for common session ID patterns
-    import re
     # Match patterns like "session-xxxxx" or "Session ID: xxxxx"
     patterns = [
         r'session[_-]id[:\s]+([a-zA-Z0-9_-]+)',
