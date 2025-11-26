@@ -515,6 +515,9 @@ class PrologParser:
                     error_term = PrologError.syntax_error("unexpected_char", context)
                     raise PrologThrow(error_term)
             error_term = PrologError.syntax_error(str(e), context)
+            # We handle these specific Lark errors here so they are normalized to
+            # `PrologThrow` before control leaves the try; otherwise the outer
+            # `LarkError` handler never runs and tests break.
             raise PrologThrow(error_term)
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
