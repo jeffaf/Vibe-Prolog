@@ -68,11 +68,13 @@ class PrologInterpreter:
     def _execute_initialization_goals(self):
         """Execute collected initialization goals."""
         from vibeprolog.unification import Substitution
-        for goal in self.initialization_goals:
-            # Execute the goal, but ignore solutions since initialization is for side effects
-            # Use _solve_goals directly to allow exceptions to propagate (query catches them)
-            list(self.engine._solve_goals([goal], Substitution()))
-        self.initialization_goals.clear()  # Clear after execution
+        try:
+            for goal in self.initialization_goals:
+                # Execute the goal, but ignore solutions since initialization is for side effects
+                # Use _solve_goals directly to allow exceptions to propagate (query catches them)
+                list(self.engine._solve_goals([goal], Substitution()))
+        finally:
+            self.initialization_goals.clear()  # Clear after execution
 
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
