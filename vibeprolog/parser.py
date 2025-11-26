@@ -3,7 +3,7 @@
 import re
 
 from lark import Lark, Transformer
-from lark.exceptions import LarkError
+from lark.exceptions import LarkError, UnexpectedCharacters, UnexpectedToken
 from dataclasses import dataclass
 from typing import Any
 
@@ -503,6 +503,19 @@ class PrologParser:
         try:
             text = self._strip_block_comments(text)
             return self.parser.parse(text)
+        except (UnexpectedToken, UnexpectedCharacters) as e:
+            # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
+            # surface the ISO-style unexpected_char error rather than the raw Lark token message.
+            last_token = getattr(e, "token_history", None)
+            if last_token:
+                last_token = last_token[-1]
+                if getattr(last_token, "type", None) == "CHAR_CODE" and str(last_token).startswith(
+                    "0'\\x"
+                ):
+                    error_term = PrologError.syntax_error("unexpected_char", context)
+                    raise PrologThrow(error_term)
+            error_term = PrologError.syntax_error(str(e), context)
+            raise PrologThrow(error_term)
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
             error_term = PrologError.syntax_error(str(e), context)
