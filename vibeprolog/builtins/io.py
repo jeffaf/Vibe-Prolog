@@ -86,7 +86,7 @@ class _TermReader:
             self.started = True
 
             # Quoting handling
-            if self.in_single_quote:
+            if self.in_single_quote or self.in_double_quote:
                 self.buffer.append(ch)
                 if self.escape_next:
                     self.escape_next = False
@@ -94,19 +94,10 @@ class _TermReader:
                 if ch == "\\":
                     self.escape_next = True
                     continue
-                if ch == "'":
-                    self.in_single_quote = False
-                continue
 
-            if self.in_double_quote:
-                self.buffer.append(ch)
-                if self.escape_next:
-                    self.escape_next = False
-                    continue
-                if ch == "\\":
-                    self.escape_next = True
-                    continue
-                if ch == '"':
+                if self.in_single_quote and ch == "'":
+                    self.in_single_quote = False
+                elif self.in_double_quote and ch == '"':
                     self.in_double_quote = False
                 continue
 
