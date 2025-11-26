@@ -50,13 +50,21 @@ class Clause:
         return self.body is not None
 
 
+@dataclass
+class Directive:
+    """A Prolog directive (e.g., :- initialization(goal).)."""
+
+    goal: Any  # The directive term, e.g., initialization(goal)
+
+
 # Lark grammar for Prolog
 PROLOG_GRAMMAR = r"""
-    start: clause+
+    start: (clause | directive)+
 
     clause: fact | rule
     fact: term "."
     rule: term ":-" goals "."
+    directive: ":-" term "."
 
     goals: term ("," term)*
 
@@ -84,7 +92,8 @@ PROLOG_GRAMMAR = r"""
 
     pow_expr: primary (POW_OP primary)*
 
-    primary: compound
+    primary: operator_atom
+        | compound
         | curly_braces
         | string
         | cut
@@ -96,11 +105,13 @@ PROLOG_GRAMMAR = r"""
         | "(" term ")"
 
     compound: atom "(" args ")"
+    operator_atom: OPERATOR_ATOM
     args: comparison_term ("," comparison_term)*
 
     curly_braces: "{" term "}"
 
     COMP_OP: "=.." | "is" | "=" | "\\=" | "=:=" | "=\=" | "<" | ">" | "=<" | ">=" | "==" | "\\==" | "@<" | "@=<" | "@>" | "@>="
+    OPERATOR_ATOM: ":-"
     PREFIX_OP.3: "\\+" | "+" | "-"
     ADD_OP: "+" | "-"
     POW_OP.2: "**"
@@ -136,7 +147,7 @@ PROLOG_GRAMMAR = r"""
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
-    SPECIAL_ATOM_OPS.5: /-\$/ | /:-/
+    SPECIAL_ATOM_OPS.5: /-\$/
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
 
     VARIABLE: /[A-Z_][a-zA-Z0-9_]*/
@@ -159,6 +170,9 @@ class PrologTransformer(Transformer):
 
     def clause(self, items):
         return items[0]
+
+    def directive(self, items):
+        return Directive(goal=items[0])
 
     def fact(self, items):
         return Clause(head=items[0], body=None)
@@ -316,6 +330,9 @@ class PrologTransformer(Transformer):
         return s
 
     def atom(self, items):
+        return Atom(str(items[0]))
+
+    def operator_atom(self, items):
         return Atom(str(items[0]))
 
     def variable(self, items):
@@ -498,11 +515,12 @@ class PrologParser:
             i += 1
         return ''.join(result)
 
-    def parse(self, text: str, context: str = "parse/1") -> list[Clause]:
+    def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
             text = self._strip_block_comments(text)
-            return self.parser.parse(text)
+            parsed_items = self.parser.parse(text)
+            return parsed_items
         except (UnexpectedToken, UnexpectedCharacters) as e:
             # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
             # surface the ISO-style unexpected_char error rather than the raw Lark token message.
