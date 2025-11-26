@@ -36,4 +36,4 @@ def test_current_module_builtin():
     prolog.consult_string(":- module(m1, [a/1]).\n")
     sols = prolog.query("current_module(M)")
     names = set(s["M"] for s in sols)
-    assert "m1" in names
+    assert names == {"m1", "user"}
