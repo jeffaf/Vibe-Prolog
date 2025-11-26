@@ -128,20 +128,20 @@ def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
             stdout, stderr = process.communicate(input=issue_content, timeout=config.timeout_seconds)
 
             # If using JSON output, try to parse and display
-            if config.use_json_output and stdout:
-                try:
-                    result = json.loads(stdout)
-                    # Extract session ID if present
-                    if isinstance(result, dict) and "session_id" in result:
-                        session_id = result["session_id"]
-                        if config.session_dir:
-                            save_session_id(session_id, config.session_dir)
-                            print(f"Session ID saved: {session_id}")
-                    print(json.dumps(result, indent=2))
-                except json.JSONDecodeError:
-                    print(stdout)
-            else:
-                if stdout:
+            if stdout:
+                if config.use_json_output:
+                    try:
+                        result = json.loads(stdout)
+                        # Extract session ID if present
+                        if isinstance(result, dict) and "session_id" in result:
+                            session_id = result["session_id"]
+                            if config.session_dir:
+                                save_session_id(session_id, config.session_dir)
+                                print(f"Session ID saved: {session_id}")
+                        print(json.dumps(result, indent=2))
+                    except json.JSONDecodeError:
+                        print(stdout)
+                else:
                     print(stdout)
 
             if stderr:
@@ -153,11 +153,7 @@ def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
         except subprocess.TimeoutExpired:
             # Kill the process
             process.kill()
-            process.communicate()
-
-            # Try to extract session ID from partial output
-            stdout_data = process.stdout.read() if process.stdout else ""
-            stderr_data = process.stderr.read() if process.stderr else ""
+            stdout_data, stderr_data = process.communicate()
 
             session_id = extract_session_id_from_output(stdout_data, stderr_data)
 
@@ -188,12 +184,15 @@ def extract_session_id_from_output(stdout: str, stderr: str) -> str | None:
     combined = stdout + "\n" + stderr
 
     # Try to parse as JSON first
-    try:
-        data = json.loads(stdout if stdout else stderr)
-        if isinstance(data, dict) and "session_id" in data:
-            return str(data["session_id"])
-    except (json.JSONDecodeError, ValueError):
-        pass
+    for stream_content in (stdout, stderr):
+        if not stream_content:
+            continue
+        try:
+            data = json.loads(stream_content)
+            if isinstance(data, dict) and "session_id" in data:
+                return str(data["session_id"])
+        except (json.JSONDecodeError, ValueError):
+            pass
 
     # Look for common session ID patterns
     import re
