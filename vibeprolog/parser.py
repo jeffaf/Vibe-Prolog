@@ -2,7 +2,7 @@
 
 import re
 
-from lark import Lark, Transformer
+from lark import Lark, Transformer, v_args
 from lark.exceptions import LarkError, UnexpectedCharacters, UnexpectedToken
 from dataclasses import dataclass
 from typing import Any
@@ -43,6 +43,7 @@ class Clause:
     head: Compound
     body: list[Compound] | None = None  # None for facts
     doc: str | None = None  # PlDoc documentation
+    meta: Any = None  # Lark meta information
 
     def is_fact(self):
         return self.body is None
@@ -57,6 +58,7 @@ class Directive:
 
     goal: Any  # The directive term, e.g., initialization(goal)
     doc: str | None = None  # PlDoc documentation
+    meta: Any = None  # Lark meta information
 
 
 @dataclass
@@ -195,8 +197,9 @@ class PrologTransformer(Transformer):
     def clause(self, items):
         return items[0]
 
-    def directive(self, items):
-        return Directive(goal=items[0])
+    @v_args(meta=True)
+    def directive(self, meta, items):
+        return Directive(goal=items[0], meta=meta)
 
     def predicate_indicators(self, items):
         return items
@@ -210,12 +213,14 @@ class PrologTransformer(Transformer):
     def discontiguous_directive(self, items):
         return PredicatePropertyDirective("discontiguous", tuple(items[0]))
 
-    def fact(self, items):
-        return Clause(head=items[0], body=None)
+    @v_args(meta=True)
+    def fact(self, meta, items):
+        return Clause(head=items[0], body=None, meta=meta)
 
-    def rule(self, items):
+    @v_args(meta=True)
+    def rule(self, meta, items):
         head, body = items
-        return Clause(head=head, body=body)
+        return Clause(head=head, body=body, meta=meta)
 
     def goals(self, items):
         return items
@@ -509,7 +514,7 @@ class PrologParser:
 
     def __init__(self):
         self.parser = Lark(
-            PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer(), propagate_positions=True
+            PROLOG_GRAMMAR, parser="lalr", propagate_positions=True
         )
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
@@ -570,35 +575,40 @@ class PrologParser:
         return ''.join(result), pldoc_comments
 
     def _collect_pldoc_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
-        """Collect PlDoc comments and return cleaned text with positions."""
-        # Collect %% line comments
-        lines = text.split('\n')
+        """Collect PlDoc comments and return cleaned text with positions in cleaned text."""
         pldoc_comments = []
-        cleaned_lines = []
-        for line_no, line in enumerate(lines):
-            stripped = line.strip()
-            if stripped.startswith('%%'):
-                # Calculate position in original text
-                pos = sum(len(l) + 1 for l in lines[:line_no])  # +1 for \n
-                comment = stripped[2:]  # Keep whitespace
+        cleaned = []
+        i = 0
+        while i < len(text):
+            if text.startswith('%%', i):
+                # Line comment
+                pos = len(''.join(cleaned))  # position in cleaned text
+                # Find end of line
+                end = text.find('\n', i)
+                if end == -1:
+                    end = len(text)
+                comment = text[i+2:end].rstrip('\n')
                 pldoc_comments.append((pos, comment))
-                cleaned_lines.append('')  # Remove the line
+                i = end + 1 if end < len(text) else len(text)
+            elif text.startswith('/*', i):
+                # Block comment
+                pos = len(''.join(cleaned))
+                is_pldoc = text.startswith('/**', i) or text.startswith('/*!', i)
+                i += 3 if is_pldoc else 2
+                comment_content = []
+                while i < len(text):
+                    if text.startswith('*/', i):
+                        i += 2
+                        break
+                    comment_content.append(text[i])
+                    i += 1
+                if is_pldoc:
+                    comment = ''.join(comment_content)
+                    pldoc_comments.append((pos, comment))
             else:
-                cleaned_lines.append(line)
-        cleaned_text = '\n'.join(cleaned_lines)
-
-        # Collect block comments
-        cleaned_text, block_comments = self._strip_block_comments(cleaned_text)
-
-        # Clean up block comment content
-        cleaned_block_comments = []
-        for pos, content in block_comments:
-            # For PlDoc, keep the content as is (preserve formatting)
-            cleaned_block_comments.append((pos, content))
-
-        pldoc_comments.extend(cleaned_block_comments)
-
-        # Sort by position
+                cleaned.append(text[i])
+                i += 1
+        cleaned_text = ''.join(cleaned)
         pldoc_comments.sort(key=lambda x: x[0])
         return cleaned_text, pldoc_comments
 
@@ -606,45 +616,34 @@ class PrologParser:
         """Associate PlDoc comments with clauses/directives."""
         if not comments:
             return
+
         # Robust association: attach each comment to the next item by source position.
         # We rely on Lark's propagate_positions to furnish item.meta.start_pos where available.
-        # Build a list of (start_pos, item) for items that expose a start_pos via meta.
-        items_with_pos = []
+        entities: list[tuple[int, str, object]] = []
+        for pos, text in comments:
+            entities.append((pos, 'comment', text))
         for item in items:
-            start_pos = None
-            if hasattr(item, 'meta') and getattr(item.meta, 'start_pos', None) is not None:
-                start_pos = item.meta.start_pos
-            items_with_pos.append((start_pos, item))
+            start_pos = getattr(item.meta, 'start_pos', None) if hasattr(item, 'meta') else None
+            if start_pos is not None:
+                entities.append((start_pos, 'item', item))
 
-        # Iterate items in order and attach preceding comments to the following item
-        comment_idx = 0
-        # Sort items by start_pos where possible
-        for pos, item in sorted(items_with_pos, key=lambda x: (x[0] if x[0] is not None else float('inf'))):
-            if comment_idx >= len(comments):
-                break
-            comment_pos, comment_text = comments[comment_idx]
-            if pos is None:
-                # If we don't have a pos, fall back to the next item
-                if isinstance(item, Clause) or isinstance(item, Directive):
-                    item.doc = comment_text
-                    comment_idx += 1
-            else:
-                if comment_pos < pos:
-                    item.doc = comment_text
-                    comment_idx += 1
-                # else, wait for a later item
-        # If any remaining comments, attach to the last item
-        if items:
-            last = items[-1]
-            while comment_idx < len(comments):
-                last.doc = comments[comment_idx][1]
-                comment_idx += 1
+        entities.sort(key=lambda x: x[0])
+        last_comment_text: str | None = None
+        for _, entity_type, payload in entities:
+            if entity_type == 'comment':
+                last_comment_text = payload
+            elif entity_type == 'item':
+                if last_comment_text is not None:
+                    payload.doc = last_comment_text
+                last_comment_text = None
 
     def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
             text, pldoc_comments = self._collect_pldoc_comments(text)
-            parsed_items = self.parser.parse(text)
+            tree = self.parser.parse(text)
+            transformer = PrologTransformer()
+            parsed_items = transformer.transform(tree)
             # Associate PlDoc comments with items
             self._associate_pldoc_comments(parsed_items, pldoc_comments)
             return parsed_items
@@ -678,7 +677,9 @@ class PrologParser:
         try:
             # Add a period to make it a valid clause
             text, _ = self._collect_pldoc_comments(f"dummy({text}).")
-            result = self.parser.parse(text)
+            tree = self.parser.parse(text)
+            transformer = PrologTransformer()
+            result = transformer.transform(tree)
             if result and isinstance(result[0], Clause):
                 compound = result[0].head
                 if isinstance(compound, Compound) and compound.args:
