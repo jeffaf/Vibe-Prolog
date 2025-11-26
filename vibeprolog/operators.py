@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, Tuple
 
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List
