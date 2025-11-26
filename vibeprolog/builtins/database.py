@@ -202,7 +202,7 @@ class DatabaseBuiltins:
         # Update the index if clauses were removed
         if had_clauses:
             engine._predicate_index.discard((name, arity))
-            engine.predicate_sources[(name, arity)] = set()
+            engine.predicate_sources.pop((name, arity), None)
 
         return subst
 
