@@ -4,7 +4,10 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from .address_pr_comments import address_pr_comments_with_kilocode as _address_pr_comments_with_kilocode
+from .address_pr_comments import (
+    address_pr_comments_with_claude as _address_pr_comments_with_claude,
+    address_pr_comments_with_kilocode as _address_pr_comments_with_kilocode,
+)
 from .change_tracker import generate_changelog as _generate_changelog
 from .gh_pr_helper import gh_pr_helper as _gh_pr_helper
 from .issue_workflow import IssueWorkflowConfig, run_issue_workflow
@@ -49,6 +52,11 @@ def fix_issue_with_claude(argv: Sequence[str] | None = None) -> None:
 def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
     """CLI wrapper for addressing PR comments using Kilocode."""
     _address_pr_comments_with_kilocode(_argv(argv))
+
+
+def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
+    """CLI wrapper for addressing PR comments using Claude Code."""
+    _address_pr_comments_with_claude(_argv(argv))
 
 
 def generate_changelog(argv: Sequence[str] | None = None) -> None:

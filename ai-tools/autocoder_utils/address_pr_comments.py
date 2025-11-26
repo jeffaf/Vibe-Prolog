@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import subprocess
 import sys
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
@@ -18,6 +22,29 @@ from . import (
     run,
     stage_changes,
 )
+
+
+@dataclass(frozen=True)
+class PRCommentWorkflowConfig:
+    """Configuration for running PR comment workflow with a specific tool."""
+
+    tool_name: str
+    """Display name of the tool (e.g., 'kilocode', 'claude')."""
+
+    tool_cmd: Sequence[str] | None = None
+    """Command to run the tool. If None, uses preprocessing only."""
+
+    timeout_seconds: int | None = None
+    """Timeout for tool execution in seconds."""
+
+    session_dir: Path | None = None
+    """Directory to save session IDs for resumable sessions."""
+
+    use_json_output: bool = False
+    """Whether the tool outputs JSON with session information."""
+
+    preprocess_prompt: str | None = None
+    """Optional LLM prompt to preprocess PR comments before sending to tool."""
 
 
 def _argv_or_sys(argv: Sequence[str] | None) -> Sequence[str]:
@@ -86,17 +113,132 @@ def get_gh_pr_output(helper_path: Path, owner: str, repo: str, pr_number: str) -
     )
 
 
-def build_changes_to_make(pr_output: str) -> str:
-    prompt = (
+def build_changes_to_make(pr_output: str, custom_prompt: str | None = None) -> str:
+    """Build instructions for addressing PR comments using LLM preprocessing."""
+    default_prompt = (
         "Read the PR comments below and generate precise instructions to address them. "
         "We only want to include things that we want to fix, so be sure to remove comments have been marked as resolved or are made redundant by subsequent updates. "
         "Include the diff blocks and line numbers. Format as Markdown"
     )
+    prompt = custom_prompt if custom_prompt is not None else default_prompt
     return run(["llm", "-s", prompt], input_text=pr_output)
 
 
 def run_kilocode_with_changes(changes_to_make: str) -> None:
     run(["kilocode", "--auto"], input_text=changes_to_make, capture_output=False)
+
+
+def save_session_id(session_id: str, session_dir: Path) -> None:
+    """Save a session ID to the session directory."""
+    session_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    session_file = session_dir / f"session_{timestamp}_{session_id}.txt"
+    session_file.write_text(f"{session_id}\n")
+
+
+def extract_session_id_from_output(stdout: str, stderr: str) -> str | None:
+    """Try to extract session ID from command output."""
+    combined = stdout + "\n" + stderr
+
+    # Try to parse as JSON first
+    for stream_content in (stdout, stderr):
+        if not stream_content:
+            continue
+        try:
+            data = json.loads(stream_content)
+            if isinstance(data, dict) and "session_id" in data:
+                return str(data["session_id"])
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Look for common session ID patterns
+    patterns = [
+        r'session[_-]id[:\s]+([a-zA-Z0-9_-]+)',
+        r'session[:\s]+([a-zA-Z0-9_-]+)',
+        r'"session_id"[:\s]+"([^"]+)"',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, combined, re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def run_tool_with_changes(changes_to_make: str, config: PRCommentWorkflowConfig) -> None:
+    """Run the configured tool with optional timeout and session management."""
+    if config.tool_cmd is None:
+        print("No tool command configured, skipping tool execution.")
+        return
+
+    cmd = list(config.tool_cmd)
+
+    # Add JSON output flag if configured
+    if config.use_json_output and "--output" not in cmd:
+        cmd.extend(["--output", "json"])
+
+    # If no timeout, run normally
+    if config.timeout_seconds is None:
+        run(cmd, input_text=changes_to_make, capture_output=False)
+        return
+
+    # Run with timeout
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        # Send input and wait with timeout
+        try:
+            stdout, stderr = process.communicate(input=changes_to_make, timeout=config.timeout_seconds)
+
+            # If using JSON output, try to parse and display
+            if stdout:
+                if config.use_json_output:
+                    try:
+                        result = json.loads(stdout)
+                        # Extract session ID if present
+                        if isinstance(result, dict) and "session_id" in result:
+                            session_id = result["session_id"]
+                            if config.session_dir:
+                                save_session_id(session_id, config.session_dir)
+                                print(f"Session ID saved: {session_id}")
+                        print(json.dumps(result, indent=2))
+                    except json.JSONDecodeError:
+                        print(stdout)
+                else:
+                    print(stdout)
+
+            if stderr:
+                print(stderr, file=sys.stderr)
+
+            if process.returncode != 0:
+                raise SystemExit(f"Tool failed with exit code {process.returncode}")
+
+        except subprocess.TimeoutExpired:
+            # Kill the process
+            process.kill()
+            stdout_data, stderr_data = process.communicate()
+
+            session_id = extract_session_id_from_output(stdout_data, stderr_data)
+
+            if session_id:
+                if config.session_dir:
+                    save_session_id(session_id, config.session_dir)
+                print(f"\n⏱️  Timeout after {config.timeout_seconds}s. Session ID: {session_id}", file=sys.stderr)
+                print(f"Resume with: claude --session-id {session_id}", file=sys.stderr)
+            else:
+                print(f"\n⏱️  Timeout after {config.timeout_seconds}s. No session ID found.", file=sys.stderr)
+
+            raise SystemExit(124)  # Standard timeout exit code
+
+    except FileNotFoundError:
+        raise SystemExit(f"Command not found: {cmd[0]}")
 
 
 def create_commit_from_pr_output(pr_output: str) -> None:
@@ -269,8 +411,12 @@ def resolve_pr_from_current_branch() -> tuple[str, str, str]:
     return base_owner, base_repo, pr_number
 
 
-def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
-    check_commands_available(["kilocode", "gh", "llm"])
+def run_pr_comment_workflow(argv: Sequence[str] | None, config: PRCommentWorkflowConfig) -> None:
+    """Common workflow for addressing PR comments with any tool."""
+    required_commands = ["gh", "llm"]
+    if config.tool_cmd is not None:
+        required_commands.append(config.tool_cmd[0])
+    check_commands_available(required_commands)
     ensure_env()
 
     args = _argv_or_sys(argv)
@@ -301,8 +447,38 @@ def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None
         review_comments, issue_comments, owner, repo, pr_number
     )
 
-    changes_to_make = build_changes_to_make(pr_output)
-    run_kilocode_with_changes(changes_to_make)
+    changes_to_make = build_changes_to_make(pr_output, config.preprocess_prompt)
+    run_tool_with_changes(changes_to_make, config)
     stage_changes()
     create_commit_from_pr_output(pr_output)
     push_current_branch()
+
+
+def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
+    """Address PR comments using Kilocode."""
+    config = PRCommentWorkflowConfig(
+        tool_name="kilocode",
+        tool_cmd=["kilocode", "--auto"],
+    )
+    run_pr_comment_workflow(argv, config)
+
+
+def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
+    """Address PR comments using Claude Code in headless mode."""
+    # Determine session directory (prefer ./paige relative to cwd)
+    session_dir = Path.cwd() / "paige"
+
+    config = PRCommentWorkflowConfig(
+        tool_name="claude",
+        tool_cmd=[
+            "claude",
+            "-p",
+            "Address these PR review comments",
+            "--permission-mode",
+            "acceptEdits",
+        ],
+        timeout_seconds=180,  # 3 minutes
+        session_dir=session_dir,
+        use_json_output=True,
+    )
+    run_pr_comment_workflow(argv, config)
