@@ -10,6 +10,7 @@ where ISO Prolog requires it, such as:
 import pytest
 
 from vibeprolog import PrologInterpreter
+from vibeprolog.exceptions import PrologThrow
 from vibeprolog.terms import Atom, Compound, Number
 
 
@@ -173,12 +174,18 @@ class TestExistenceError:
         check_existence_error(error, "xor", 0)
 
     def test_existence_error_without_catch_fails(self):
-        """Test that existence_error causes query to fail if not caught."""
+        """Test that existence_error propagates as PrologThrow if not caught."""
         prolog = PrologInterpreter()
 
-        # Without catch, the error should cause the query to fail
-        result = prolog.query_once("call(undefined_pred)")
-        assert result is None
+        # Without catch, the error should propagate as a PrologThrow exception
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("call(undefined_pred)")
+
+        # Verify it's an existence_error with the correct structure
+        error_term = exc_info.value.term
+        assert isinstance(error_term, Compound)
+        assert error_term.functor == "error"
+        assert len(error_term.args) == 2
 
     def test_call_with_variable_unbound(self):
         """Test that call/1 with unbound variable raises instantiation_error.
