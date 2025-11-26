@@ -1,7 +1,10 @@
-"""Tests for stream selection built-ins (current_input/1, current_output/1)."""
+"""Tests for stream selection built-ins (current_input/1, current_output/1) and stream I/O (open/3, close/1)."""
 
+import os
+import tempfile
 import pytest
 from vibeprolog import PrologInterpreter
+from vibeprolog.exceptions import PrologThrow
 
 
 @pytest.fixture
@@ -55,3 +58,122 @@ class TestStreams:
         results = prolog.query(f"{predicate}(X)")
         assert len(results) == 1
         assert results[0]["X"] == expected_atom
+
+
+class TestStreamIO:
+    """Tests for stream I/O built-ins (open/3, close/1)."""
+
+    @pytest.fixture
+    def temp_file(self):
+        """Create a temporary file for testing."""
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+            f.write('test content\n')
+            temp_path = f.name
+        yield temp_path
+        # Cleanup
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+    @pytest.mark.parametrize("mode", ["read", "write", "append"])
+    def test_open_file_modes(self, prolog: PrologInterpreter, temp_file: str, mode: str):
+        f"""Test opening file in {mode} mode."""
+        result = prolog.query_once(f"open('{temp_file}', {mode}, Stream)")
+        assert result is not None
+        assert "Stream" in result
+        assert isinstance(result["Stream"], str)
+        assert result["Stream"].startswith("$stream_")
+
+        # Close the stream
+        close_result = prolog.query_once(f"close({result['Stream']})")
+        assert close_result == {}
+
+    def test_open_nonexistent_file_read(self, prolog: PrologInterpreter):
+        """Test opening non-existent file for reading raises existence_error."""
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("open('nonexistent_file.txt', read, Stream)")
+
+        error_term = exc_info.value.term
+        assert error_term.functor == "error"
+        assert error_term.args[0].functor == "existence_error"
+        assert error_term.args[0].args[0].name == "source_sink"
+        assert error_term.args[0].args[1].name == "nonexistent_file.txt"
+
+    def test_open_invalid_mode(self, prolog: PrologInterpreter, temp_file: str):
+        """Test opening file with invalid mode raises domain_error."""
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once(f"open('{temp_file}', invalid_mode, Stream)")
+
+        error_term = exc_info.value.term
+        assert error_term.functor == "error"
+        assert error_term.args[0].functor == "domain_error"
+        assert error_term.args[0].args[0].name == "io_mode"
+        assert error_term.args[0].args[1].name == "invalid_mode"
+
+    def test_close_invalid_stream(self, prolog: PrologInterpreter):
+        """Test closing invalid stream raises existence_error."""
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("close(invalid_stream)")
+
+        error_term = exc_info.value.term
+        assert error_term.functor == "error"
+        assert error_term.args[0].functor == "existence_error"
+        assert error_term.args[0].args[0].name == "stream"
+        assert error_term.args[0].args[1].name == "invalid_stream"
+
+    def test_close_standard_streams_fails(self, prolog: PrologInterpreter):
+        """Test that closing standard streams raises existence_error."""
+        # Try to close user_input
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("close(user_input)")
+
+        error_term = exc_info.value.term
+        assert error_term.functor == "error"
+        assert error_term.args[0].functor == "existence_error"
+        assert error_term.args[0].args[0].name == "stream"
+
+    def test_stream_lifecycle(self, prolog: PrologInterpreter, temp_file: str):
+        """Test complete stream lifecycle: open, verify, close."""
+        # Open file
+        open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
+        assert open_result is not None
+        stream_handle = open_result["Stream"]
+
+        # Verify stream is in registry (by trying to close it successfully)
+        close_result = prolog.query_once(f"close({stream_handle})")
+        assert close_result == {}
+
+        # Verify stream is removed from registry (closing again should fail)
+        with pytest.raises(PrologThrow):
+            prolog.query_once(f"close({stream_handle})")
+
+    def test_multiple_streams(self, prolog: PrologInterpreter, temp_file: str):
+        """Test opening multiple streams simultaneously."""
+        # Open first stream
+        result1 = prolog.query_once(f"open('{temp_file}', read, Stream1)")
+        assert result1 is not None
+        stream1 = result1["Stream1"]
+
+        # Open second stream to same file
+        result2 = prolog.query_once(f"open('{temp_file}', read, Stream2)")
+        assert result2 is not None
+        stream2 = result2["Stream2"]
+
+        # Verify they have different handles
+        assert stream1 != stream2
+        assert stream1.startswith("$stream_")
+        assert stream2.startswith("$stream_")
+
+        # Close both
+        assert prolog.query_once(f"close({stream1})") == {}
+        assert prolog.query_once(f"close({stream2})") == {}
+
+    def test_current_streams_updated(self, prolog: PrologInterpreter):
+        """Test that current_input/1 and current_output/1 work with stream infrastructure."""
+        # These should return the standard stream handles
+        input_result = prolog.query_once("current_input(Stream)")
+        assert input_result is not None
+        assert input_result["Stream"] == "user_input"
+
+        output_result = prolog.query_once("current_output(Stream)")
+        assert output_result is not None
+        assert output_result["Stream"] == "user_output"

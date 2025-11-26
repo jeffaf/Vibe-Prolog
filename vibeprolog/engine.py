@@ -5,6 +5,8 @@ from __future__ import annotations
 import inspect
 from collections.abc import Iterator as IteratorABC
 from typing import Any, Callable, Iterator, TypeAlias
+import sys
+from dataclasses import dataclass
 
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Clause, Cut, List
@@ -17,6 +19,25 @@ BuiltinHandler: TypeAlias = Callable[
     [tuple, Substitution, "PrologEngine | None"], BuiltinResult
 ]
 BuiltinRegistry: TypeAlias = dict[tuple[str, int], BuiltinHandler]
+
+
+@dataclass(frozen=True)
+class Stream:
+    """Represents a Prolog stream (file or standard stream)."""
+    handle: Atom  # The stream handle atom
+    file_obj: Any  # Python file object or None for standard streams
+    mode: str  # 'read', 'write', or 'append'
+    filename: str | None = None  # Filename if it's a file stream
+
+    @property
+    def is_standard_stream(self) -> bool:
+        """Check if this is a standard stream (user_input, user_output, user_error)."""
+        return self.filename is None
+
+    def close(self) -> None:
+        """Close the stream if it's a file stream."""
+        if self.file_obj and not self.is_standard_stream:
+            self.file_obj.close()
 
 
 class CutException(Exception):
@@ -35,6 +56,10 @@ class PrologEngine:
         self._builtin_registry = self._build_builtin_registry()
         # Index of user-defined predicates for O(1) existence checks
         self._predicate_index: set[tuple[str, int]] = self._build_predicate_index()
+        # Stream management
+        self._streams: dict[str, Stream] = {}
+        self._stream_counter = 0
+        self._initialize_standard_streams()
 
     # Compatibility wrappers retained for tests and external callers.
     def _list_to_python(
@@ -47,11 +72,7 @@ class PrologEngine:
 
     def query(self, goals: list[Compound]) -> Iterator[Substitution]:
         """Query the knowledge base and yield all substitutions that satisfy the goals."""
-        try:
-            yield from self._solve_goals(goals, Substitution())
-        except PrologThrow:
-            # Unhandled throw - query fails with no solutions
-            return
+        yield from self._solve_goals(goals, Substitution())
 
     def _solve_goals(
         self, goals: list[Compound], subst: Substitution
@@ -411,6 +432,49 @@ class PrologEngine:
         # No clauses remain, remove from index
         self._predicate_index.discard((functor, arity))
 
+    def _initialize_standard_streams(self) -> None:
+        """Initialize the three standard streams: user_input, user_output, user_error."""
+        # Standard input stream
+        user_input = Stream(
+            handle=Atom("user_input"),
+            file_obj=sys.stdin,
+            mode="read"
+        )
+        self._streams["user_input"] = user_input
+
+        # Standard output stream
+        user_output = Stream(
+            handle=Atom("user_output"),
+            file_obj=sys.stdout,
+            mode="write"
+        )
+        self._streams["user_output"] = user_output
+
+        # Standard error stream
+        user_error = Stream(
+            handle=Atom("user_error"),
+            file_obj=sys.stderr,
+            mode="write"
+        )
+        self._streams["user_error"] = user_error
+
+    def _generate_stream_handle(self) -> Atom:
+        """Generate a unique stream handle atom."""
+        self._stream_counter += 1
+        return Atom(f"$stream_{self._stream_counter}")
+
+    def get_stream(self, handle: Atom) -> Stream | None:
+        """Get a stream by its handle atom."""
+        return self._streams.get(handle.name)
+
+    def add_stream(self, stream: Stream) -> None:
+        """Add a stream to the registry."""
+        self._streams[stream.handle.name] = stream
+
+    def remove_stream(self, handle: Atom) -> Stream | None:
+        """Remove and return a stream from the registry."""
+        return self._streams.pop(handle.name, None)
+
 
 __all__ = [
     "PrologEngine",
@@ -419,4 +483,5 @@ __all__ = [
     "BuiltinRegistry",
     "BuiltinHandler",
     "BuiltinResult",
+    "Stream",
 ]
