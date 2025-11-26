@@ -581,10 +581,8 @@ class IOBuiltins:
             )
             rendered = IOBuiltins._render_infix(term.functor, left_str, right_str)
 
-        # Do not wrap at top-level (1200). Wrap when inside a parent (parent_prec < 1200) or when parent_prec is tighter.
+        # Wrap only when the current operator binds looser than the parent context.
         if op_info.precedence > parent_prec:
-            return f"({rendered})"
-        if op_info.precedence == parent_prec and parent_prec < 1200:
             return f"({rendered})"
         return rendered
 
@@ -828,12 +826,7 @@ class IOBuiltins:
         filename_term = deref(filename_term, subst)
         mode_term = deref(mode_term, subst)
 
-        # Normalize potential escaped control characters (e.g., Windows paths parsed as \t)
-        filename = (
-            filename_term.name.replace("\t", "\\t")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-        )
+        filename = filename_term.name
         mode = mode_term.name
 
         # Validate mode
