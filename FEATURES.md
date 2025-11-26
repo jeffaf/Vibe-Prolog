@@ -93,8 +93,8 @@
 - ❌ `read/1` – Read term from input
 - ❌ `get_char/1` – Read character from input
 - ❌ `put_char/1` – Write character to output
-- ❌ `open/3` – Open file stream
-- ❌ `close/1` – Close stream
+- ✅ `open/3` – Open file stream
+- ✅ `close/1` – Close stream
 - ✅ `current_input/1` – Get current input stream
 - ✅ `current_output/1` – Get current output stream
 

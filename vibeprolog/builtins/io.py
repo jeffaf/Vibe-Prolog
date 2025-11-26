@@ -14,6 +14,7 @@ from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List, PrologParser
+from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
@@ -96,6 +97,8 @@ class IOBuiltins:
         )
         register_builtin(registry, "current_input", 1, IOBuiltins._builtin_current_input)
         register_builtin(registry, "current_output", 1, IOBuiltins._builtin_current_output)
+        register_builtin(registry, "open", 3, IOBuiltins._builtin_open)
+        register_builtin(registry, "close", 1, IOBuiltins._builtin_close)
 
     @staticmethod
     def _builtin_write(
@@ -155,17 +158,29 @@ class IOBuiltins:
 
     @staticmethod
     def _builtin_current_input(
-        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
+        if engine is None:
+            return None
         arg = deref(args[0], subst)
-        return unify(arg, USER_INPUT_STREAM, subst)
+        # Get the user_input stream from the registry
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            return None
+        return unify(arg, stream.handle, subst)
 
     @staticmethod
     def _builtin_current_output(
-        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
+        if engine is None:
+            return None
         arg = deref(args[0], subst)
-        return unify(arg, USER_OUTPUT_STREAM, subst)
+        # Get the user_output stream from the registry
+        stream = engine.get_stream(USER_OUTPUT_STREAM)
+        if stream is None:
+            return None
+        return unify(arg, stream.handle, subst)
 
     @staticmethod
     def _format_to_string(
@@ -520,7 +535,7 @@ class IOBuiltins:
         # A set of common graphic/symbolic atoms that do not need quoting.
         # This set is not exhaustive but covers many common cases.
         unquoted_graphic_atoms = {
-            '!', ';', ',', '+', '-', '*', '/', '//', '**', '=', ':-', '->', '\=',
+            '!', ';', ',', '+', '-', '*', '/', '//', '**', '=', ':-', '->', '\\=',
             '<', '>', '=<', '>=', '=:=', '=\\=', '==', '\\==',
             '@<', '@>', '@=<', '@>=', 'is', '=..', '\\+'
         }
@@ -533,6 +548,109 @@ class IOBuiltins:
 
         # Everything else needs quoting (e.g., starts with uppercase, contains spaces, looks like a number).
         return True
+
+    @staticmethod
+    def _builtin_open(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """open/3 - Open a file stream.
+
+        open(FileName, Mode, Stream)
+        Opens FileName in the specified Mode and unifies Stream with the stream handle.
+
+        Modes: 'read', 'write', 'append'
+        """
+        if engine is None:
+            return None
+
+        filename_term, mode_term, stream_var = args
+
+        # Validate argument types
+        engine._check_instantiated(filename_term, subst, "open/3")
+        engine._check_type(filename_term, Atom, "atom", subst, "open/3")
+        engine._check_instantiated(mode_term, subst, "open/3")
+        engine._check_type(mode_term, Atom, "atom", subst, "open/3")
+
+        # Arguments are valid, now get their Python values
+        filename_term = deref(filename_term, subst)
+        mode_term = deref(mode_term, subst)
+
+        filename = filename_term.name
+        mode = mode_term.name
+
+        # Validate mode
+        if mode not in ('read', 'write', 'append'):
+            # Domain error for invalid mode
+            error_term = PrologError.domain_error("io_mode", mode_term, "open/3")
+            raise PrologThrow(error_term)
+
+        # Convert mode to Python file mode
+        python_mode = {'read': 'r', 'write': 'w', 'append': 'a'}[mode]
+
+        try:
+            # Try to open the file
+            file_obj = open(filename, python_mode, encoding='utf-8')
+        except FileNotFoundError:
+            # Existence error for source_sink
+            error_term = PrologError.existence_error("source_sink", filename_term, "open/3")
+            raise PrologThrow(error_term)
+        except PermissionError:
+            # Permission error
+            error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
+            raise PrologThrow(error_term)
+        # Note: Do not catch generic OSError here to avoid masking the real IO error.
+        # Let unexpected OSError variants propagate for now.
+
+        # Generate unique stream handle
+        stream_handle = engine._generate_stream_handle()
+
+        # Create and register stream
+        stream = Stream(handle=stream_handle, file_obj=file_obj, mode=mode, filename=filename)
+        # Register into the engine's stream registry (add_stream is the public API)
+        engine.add_stream(stream)
+
+        # Unify the stream variable with the handle
+        return unify(stream_var, stream_handle, subst)
+
+    @staticmethod
+    def _builtin_close(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """close/1 - Close a stream.
+
+        close(Stream)
+        Closes the specified stream and removes it from the active streams.
+        """
+        if engine is None:
+            return None
+
+        stream_term = args[0]
+
+        engine._check_instantiated(stream_term, subst, "close/1")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "close/1")
+
+        stream_term = deref(stream_term, subst)
+
+        # Check if it's a standard stream - these cannot be closed
+        if stream_term.name in ("user_input", "user_output", "user_error"):
+            # Existence error for stream (ISO says standard streams don't exist for closing)
+            error_term = PrologError.existence_error("stream", stream_term, "close/1")
+            raise PrologThrow(error_term)
+
+        # Get the stream from registry
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            # Existence error for stream
+            error_term = PrologError.existence_error("stream", stream_term, "close/1")
+            raise PrologThrow(error_term)
+
+        # Close the stream
+        stream.close()
+
+        # Remove from registry
+        engine.remove_stream(stream_term)
+
+        return subst
 
 
 __all__ = ["IOBuiltins"]

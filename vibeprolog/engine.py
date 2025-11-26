@@ -5,9 +5,12 @@ from __future__ import annotations
 import inspect
 from collections.abc import Iterator as IteratorABC
 from typing import Any, Callable, Iterator, TypeAlias
+import sys
+from dataclasses import dataclass
 
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Clause, Cut, List
+from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
@@ -35,6 +38,10 @@ class PrologEngine:
         self._builtin_registry = self._build_builtin_registry()
         # Index of user-defined predicates for O(1) existence checks
         self._predicate_index: set[tuple[str, int]] = self._build_predicate_index()
+        # Stream management
+        self._streams: dict[str, Stream] = {}
+        self._stream_counter = 0
+        self._initialize_standard_streams()
 
     # Compatibility wrappers retained for tests and external callers.
     def _list_to_python(
@@ -47,11 +54,7 @@ class PrologEngine:
 
     def query(self, goals: list[Compound]) -> Iterator[Substitution]:
         """Query the knowledge base and yield all substitutions that satisfy the goals."""
-        try:
-            yield from self._solve_goals(goals, Substitution())
-        except PrologThrow:
-            # Unhandled throw - query fails with no solutions
-            return
+        yield from self._solve_goals(goals, Substitution())
 
     def _solve_goals(
         self, goals: list[Compound], subst: Substitution
@@ -410,6 +413,35 @@ class PrologEngine:
 
         # No clauses remain, remove from index
         self._predicate_index.discard((functor, arity))
+
+    def _initialize_standard_streams(self) -> None:
+        """Initialize the three standard streams: user_input, user_output, user_error."""
+        standard_streams_data = [
+            ("user_input", Atom("user_input"), sys.stdin, "read"),
+            ("user_output", Atom("user_output"), sys.stdout, "write"),
+            ("user_error", Atom("user_error"), sys.stderr, "write"),
+        ]
+
+        for name, handle, file_obj, mode in standard_streams_data:
+            stream = Stream(handle=handle, file_obj=file_obj, mode=mode)
+            self._streams[name] = stream
+
+    def _generate_stream_handle(self) -> Atom:
+        """Generate a unique stream handle atom."""
+        self._stream_counter += 1
+        return Atom(f"$stream_{self._stream_counter}")
+
+    def get_stream(self, handle: Atom) -> Stream | None:
+        """Get a stream by its handle atom."""
+        return self._streams.get(handle.name)
+
+    def add_stream(self, stream: Stream) -> None:
+        """Add a stream to the registry."""
+        self._streams[stream.handle.name] = stream
+
+    def remove_stream(self, handle: Atom) -> Stream | None:
+        """Remove and return a stream from the registry."""
+        return self._streams.pop(handle.name, None)
 
 
 __all__ = [

@@ -96,5 +96,21 @@ class PrologError:
         error_term = Compound('existence_error', (Atom(object_type), culprit))
         return PrologError._create_error_with_context(error_term, context)
 
+    @staticmethod
+    def permission_error(operation: str, permission_type: str, culprit: Any, context: str | None = None) -> "Compound":
+        """Create a permission_error term.
+
+        Args:
+            operation: The operation that was denied (e.g., 'open', 'access')
+            permission_type: Type of permission (e.g., 'source_sink', 'input', 'output')
+            culprit: The object for which permission was denied
+            context: Name of the predicate that caused the error
+
+        Returns:
+            error(permission_error(Operation, PermissionType, Culprit), context(Predicate))
+        """
+        error_term = Compound('permission_error', (Atom(operation), Atom(permission_type), culprit))
+        return PrologError._create_error_with_context(error_term, context)
+
 
 __all__ = ["PrologThrow", "PrologError"]
