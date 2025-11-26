@@ -121,19 +121,13 @@ class ArithmeticBuiltins:
                     return None
 
             # Binary math functions
-            if expr.functor == "min" and len(expr.args) == 2:
+            BINARY_MATH_FUNCTIONS = {"min": min, "max": max}
+            if expr.functor in BINARY_MATH_FUNCTIONS and len(expr.args) == 2:
                 left = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
                 right = ArithmeticBuiltins._eval_arithmetic(expr.args[1], subst, engine)
                 if left is None or right is None:
                     return None
-                return min(left, right)
-
-            if expr.functor == "max" and len(expr.args) == 2:
-                left = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                right = ArithmeticBuiltins._eval_arithmetic(expr.args[1], subst, engine)
-                if left is None or right is None:
-                    return None
-                return max(left, right)
+                return BINARY_MATH_FUNCTIONS[expr.functor](left, right)
 
             # Unary math functions
             if expr.functor == "abs" and len(expr.args) == 1:
