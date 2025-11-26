@@ -46,9 +46,8 @@ class PRCommentWorkflowConfig:
     preprocess_prompt: str | None = None
     """Optional LLM prompt to preprocess PR comments before sending to tool."""
 
-
-def _argv_or_sys(argv: Sequence[str] | None) -> Sequence[str]:
-    return argv if argv is not None else sys.argv
+    input_instruction: str | None = None
+    """Optional preamble prepended to the tool input."""
 
 
 def get_pr_info(owner: str, repo: str, pr_number: str) -> dict:
@@ -411,7 +410,7 @@ def resolve_pr_from_current_branch() -> tuple[str, str, str]:
     return base_owner, base_repo, pr_number
 
 
-def run_pr_comment_workflow(argv: Sequence[str] | None, config: PRCommentWorkflowConfig) -> None:
+def run_pr_comment_workflow(pr_number_arg: str | None, config: PRCommentWorkflowConfig) -> None:
     """Common workflow for addressing PR comments with any tool."""
     required_commands = ["gh", "llm"]
     if config.tool_cmd is not None:
@@ -419,19 +418,13 @@ def run_pr_comment_workflow(argv: Sequence[str] | None, config: PRCommentWorkflo
     check_commands_available(required_commands)
     ensure_env()
 
-    args = _argv_or_sys(argv)
-    if len(args) > 1 and args[1] in {"-h", "--help"}:
-        print(f"Usage: {args[0]} [pr-number]", file=sys.stderr)
-        raise SystemExit(1)
-
-    pr_number = args[1] if len(args) > 1 else None
-
     repo_root = get_repo_root()
     os.chdir(repo_root)
 
-    if pr_number is None:
+    if pr_number_arg is None:
         owner, repo, pr_number = resolve_pr_from_current_branch()
     else:
+        pr_number = pr_number_arg
         owner, repo = get_owner_repo()
 
     pr_info = get_pr_info(owner, repo, pr_number)
@@ -448,22 +441,30 @@ def run_pr_comment_workflow(argv: Sequence[str] | None, config: PRCommentWorkflo
     )
 
     changes_to_make = build_changes_to_make(pr_output, config.preprocess_prompt)
-    run_tool_with_changes(changes_to_make, config)
+    tool_input = changes_to_make
+    if config.input_instruction:
+        tool_input = f"{config.input_instruction}\n\n{changes_to_make}"
+    run_tool_with_changes(tool_input, config)
     stage_changes()
     create_commit_from_pr_output(pr_output)
     push_current_branch()
 
 
-def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
+def address_pr_comments_with_kilocode(
+    pr_number: str | None = None, timeout_seconds: int | None = 1200
+) -> None:
     """Address PR comments using Kilocode."""
     config = PRCommentWorkflowConfig(
         tool_name="kilocode",
         tool_cmd=["kilocode", "--auto"],
+        timeout_seconds=timeout_seconds,
     )
-    run_pr_comment_workflow(argv, config)
+    run_pr_comment_workflow(pr_number, config)
 
 
-def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
+def address_pr_comments_with_claude(
+    pr_number: str | None = None, timeout_seconds: int | None = 180
+) -> None:
     """Address PR comments using Claude Code in headless mode."""
     # Determine session directory (prefer ./paige relative to cwd)
     session_dir = Path.cwd() / "paige"
@@ -477,8 +478,32 @@ def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
             "--permission-mode",
             "acceptEdits",
         ],
-        timeout_seconds=180,  # 3 minutes
+        timeout_seconds=timeout_seconds,
         session_dir=session_dir,
         use_json_output=True,
     )
-    run_pr_comment_workflow(argv, config)
+    run_pr_comment_workflow(pr_number, config)
+
+
+def address_pr_comments_with_codex(
+    pr_number: str | None = None, timeout_seconds: int | None = 180
+) -> None:
+    """Address PR comments using the Codex CLI headless mode."""
+    config = PRCommentWorkflowConfig(
+        tool_name="codex",
+        tool_cmd=[
+            "codex",
+            "exec",
+            "--full-auto",
+            "--sandbox",
+            "danger-full-access",
+            "-",
+        ],
+        timeout_seconds=timeout_seconds,
+        input_instruction=(
+            "You are Codex running headless. Address the PR review comments described "
+            "below by editing this repository, running tests as appropriate, and summarizing "
+            "your updates before finishing."
+        ),
+    )
+    run_pr_comment_workflow(pr_number, config)
