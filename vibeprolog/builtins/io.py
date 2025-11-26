@@ -596,7 +596,7 @@ class IOBuiltins:
             # Permission error
             error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
             raise PrologThrow(error_term)
-        except OSError as e:
+        except OSError:
             # Generic I/O error - map to permission_error
             error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
             raise PrologThrow(error_term)

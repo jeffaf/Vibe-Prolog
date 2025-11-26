@@ -434,29 +434,15 @@ class PrologEngine:
 
     def _initialize_standard_streams(self) -> None:
         """Initialize the three standard streams: user_input, user_output, user_error."""
-        # Standard input stream
-        user_input = Stream(
-            handle=Atom("user_input"),
-            file_obj=sys.stdin,
-            mode="read"
-        )
-        self._streams["user_input"] = user_input
+        standard_streams_data = [
+            ("user_input", sys.stdin, "read"),
+            ("user_output", sys.stdout, "write"),
+            ("user_error", sys.stderr, "write"),
+        ]
 
-        # Standard output stream
-        user_output = Stream(
-            handle=Atom("user_output"),
-            file_obj=sys.stdout,
-            mode="write"
-        )
-        self._streams["user_output"] = user_output
-
-        # Standard error stream
-        user_error = Stream(
-            handle=Atom("user_error"),
-            file_obj=sys.stderr,
-            mode="write"
-        )
-        self._streams["user_error"] = user_error
+        for name, file_obj, mode in standard_streams_data:
+            stream = Stream(handle=Atom(name), file_obj=file_obj, mode=mode)
+            self.add_stream(stream)
 
     def _generate_stream_handle(self) -> Atom:
         """Generate a unique stream handle atom."""
