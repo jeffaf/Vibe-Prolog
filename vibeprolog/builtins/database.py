@@ -113,8 +113,6 @@ class DatabaseBuiltins:
         matches = []
         retracted_predicates = set()  # Track predicates that were retracted
 
-        predicate_keys = set()
-
         for i, clause in enumerate(engine.clauses):
             renamed_clause = engine._rename_variables(clause)
 
@@ -140,10 +138,9 @@ class DatabaseBuiltins:
                     key = (head.name, 0)
                 else:
                     continue
-                predicate_keys.add(key)
                 retracted_predicates.add(key)
 
-        for key in predicate_keys:
+        for key in retracted_predicates:
             engine._ensure_dynamic_permission(key, "retract/1")
 
         for i, new_subst in reversed(matches):
