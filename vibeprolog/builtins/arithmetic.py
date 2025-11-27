@@ -14,11 +14,68 @@ from typing import TYPE_CHECKING, Any
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Compound, Number
+from vibeprolog.terms import Variable
 from vibeprolog.unification import Substitution, deref, unify
 
 if TYPE_CHECKING:
     from vibeprolog.engine import PrologEngine
+
+
+def _check_instantiated(term: Any, subst: Substitution, engine: "PrologEngine", predicate: str) -> None:
+    """Check if arithmetic expression is fully instantiated."""
+    # Dereference term
+    term = deref(term, subst)
+
+    # Check if variable
+    if isinstance(term, Variable):
+        raise PrologThrow(PrologError.instantiation_error(predicate))
+
+    # Recursively check compound terms
+    if isinstance(term, Compound):
+        for arg in term.args:  # Skip functor
+            _check_instantiated(arg, subst, engine, predicate)
+
+
+def _check_evaluable(term: Any, subst: Substitution, engine: "PrologEngine", predicate: str) -> None:
+    """Check if term is a valid arithmetic expression."""
+    term = deref(term, subst)
+
+    # Numbers are always evaluable
+    if isinstance(term, Number):
+        return
+
+    # Variables should have been caught by _check_instantiated
+    if isinstance(term, Variable):
+        raise PrologThrow(PrologError.instantiation_error(predicate))
+
+    # Check if it's a valid arithmetic functor
+    if isinstance(term, Compound):
+        functor = term.functor
+        arity = len(term.args)
+
+        # List of valid arithmetic functors
+        valid_functors = {
+            ('+', 1), ('+', 2), ('-', 1), ('-', 2),
+            ('*', 2), ('/', 2), ('//', 2), ('mod', 2),
+            ('**', 2), ('abs', 1), ('sign', 1),
+            ('min', 2), ('max', 2),
+            ('sqrt', 1), ('exp', 1), ('log', 1),
+            ('sin', 1), ('cos', 1), ('tan', 1),
+            ('floor', 1), ('ceiling', 1), ('round', 1),
+        }
+
+        if (functor, arity) not in valid_functors:
+            raise PrologThrow(PrologError.type_error("evaluable", term, predicate))
+
+        # Recursively check arguments
+        for arg in term.args:
+            _check_evaluable(arg, subst, engine, predicate)
+
+    else:
+        # Atoms and other types are not evaluable
+        raise PrologThrow(PrologError.type_error("evaluable", term, predicate))
 
 
 class ArithmeticBuiltins:
@@ -45,172 +102,212 @@ class ArithmeticBuiltins:
     def _builtin_is(
         args: BuiltinArgs, subst: Substitution, engine: PrologEngine
     ) -> Substitution | None:
-        """Evaluate the right-hand arithmetic expression and unify with the left."""
-        value = ArithmeticBuiltins._eval_arithmetic(args[1], subst, engine)
-        if value is None:
-            return None
-        return unify(args[0], Number(value), subst)
+        """is/2 - Arithmetic evaluation with ISO error handling."""
+        result_term, expr = args
+
+        try:
+            # Evaluate the arithmetic expression
+            value = ArithmeticBuiltins._evaluate_arithmetic(expr, subst, engine, "is/2")
+
+            # Unify with result
+            new_subst = unify(result_term, Number(value), subst)
+            if new_subst is not None:
+                yield new_subst
+
+        except PrologThrow:
+            # Re-raise Prolog errors
+            raise
+        except Exception as e:
+            # Unexpected errors - convert to evaluation error
+            raise PrologThrow(PrologError.evaluation_error("error", "is/2"))
 
     @staticmethod
     def _builtin_arithmetic_compare(
         op: str, args: BuiltinArgs, subst: Substitution, engine: PrologEngine
     ) -> Substitution | None:
-        """Perform numeric comparison between two arithmetic expressions."""
-        left_val = ArithmeticBuiltins._eval_arithmetic(args[0], subst, engine)
-        right_val = ArithmeticBuiltins._eval_arithmetic(args[1], subst, engine)
+        """Perform numeric comparison between two arithmetic expressions with error handling."""
+        try:
+            left_val = ArithmeticBuiltins._evaluate_arithmetic(args[0], subst, engine, f"{op}/2")
+            right_val = ArithmeticBuiltins._evaluate_arithmetic(args[1], subst, engine, f"{op}/2")
 
-        if left_val is None or right_val is None:
-            return None
+            if op == "=:=" and left_val == right_val:
+                yield subst
+            elif op == r"=\=" and left_val != right_val:
+                yield subst
+            elif op == "<" and left_val < right_val:
+                yield subst
+            elif op == ">" and left_val > right_val:
+                yield subst
+            elif op == "=<" and left_val <= right_val:
+                yield subst
+            elif op == ">=" and left_val >= right_val:
+                yield subst
 
-        if op == "=:=" and left_val == right_val:
-            return subst
-        if op == r"=\=" and left_val != right_val:
-            return subst
-        if op == "<" and left_val < right_val:
-            return subst
-        if op == ">" and left_val > right_val:
-            return subst
-        if op == "=<" and left_val <= right_val:
-            return subst
-        if op == ">=" and left_val >= right_val:
-            return subst
-        return None
+        except PrologThrow:
+            # Re-raise Prolog errors
+            raise
 
+    @staticmethod
+    def _evaluate_arithmetic(
+        expr: Any, subst: Substitution, engine: PrologEngine, predicate: str = "is/2"
+    ) -> int | float:
+        """Evaluate arithmetic expression with ISO error handling.
+
+        Args:
+            expr: The expression to evaluate
+            subst: Current substitution
+            engine: Prolog engine
+            predicate: Name of calling predicate (for error context)
+
+        Returns:
+            Numeric result
+
+        Raises:
+            PrologThrow with appropriate error term
+        """
+        # Dereference
+        expr = deref(expr, subst)
+
+        # Check for instantiation
+        _check_instantiated(expr, subst, engine, predicate)
+
+        # Check if evaluable (valid arithmetic expression)
+        _check_evaluable(expr, subst, engine, predicate)
+
+        # Numbers evaluate to themselves
+        if isinstance(expr, Number):
+            return expr.value
+
+        # Handle compound expressions
+        if isinstance(expr, Compound):
+            functor = expr.functor
+            args = expr.args
+
+            # Evaluate arguments recursively
+            try:
+                evaluated_args = [
+                    ArithmeticBuiltins._evaluate_arithmetic(arg, subst, engine, predicate)
+                    for arg in args
+                ]
+            except PrologThrow:
+                raise  # Re-raise Prolog errors
+            except Exception as e:
+                raise PrologThrow(PrologError.type_error("evaluable", expr, predicate))
+
+            # Apply operation
+            try:
+                return ArithmeticBuiltins._apply_arithmetic_op(functor, evaluated_args, predicate)
+            except ZeroDivisionError:
+                raise PrologThrow(PrologError.evaluation_error("zero_divisor", predicate))
+            except ValueError as e:
+                # Domain errors (sqrt of negative, log of negative, etc.)
+                raise PrologThrow(PrologError.evaluation_error("undefined", predicate))
+            except OverflowError:
+                raise PrologThrow(PrologError.evaluation_error("float_overflow", predicate))
+
+        # Not a number or valid expression
+        raise PrologThrow(PrologError.type_error("evaluable", expr, predicate))
+
+    @staticmethod
+    def _apply_arithmetic_op(functor: str, args: list[int | float], predicate: str) -> int | float:
+        """Apply arithmetic operation with domain checking.
+
+        Raises:
+            ZeroDivisionError: For division by zero
+            ValueError: For undefined operations (sqrt(-1), log(-1), etc.)
+            OverflowError: For float overflow
+        """
+        # Unary operations
+        if len(args) == 1:
+            arg = args[0]
+
+            if functor == '+':
+                return +arg
+            elif functor == '-':
+                return -arg
+            elif functor == 'abs':
+                return abs(arg)
+            elif functor == 'sign':
+                return 1 if arg > 0 else (-1 if arg < 0 else 0)
+            elif functor == 'sqrt':
+                if arg < 0:
+                    raise ValueError("sqrt of negative")
+                return math.sqrt(arg)
+            elif functor == 'exp':
+                try:
+                    return math.exp(arg)
+                except OverflowError:
+                    raise
+            elif functor == 'log':
+                if arg <= 0:
+                    raise ValueError("log of non-positive")
+                return math.log(arg)
+            elif functor == 'sin':
+                return math.sin(arg)
+            elif functor == 'cos':
+                return math.cos(arg)
+            elif functor == 'tan':
+                return math.tan(arg)
+            elif functor == 'floor':
+                return math.floor(arg)
+            elif functor == 'ceiling':
+                return math.ceil(arg)
+            elif functor == 'round':
+                return round(arg)
+            else:
+                raise ValueError(f"Unknown unary operator: {functor}")
+
+        # Binary operations
+        elif len(args) == 2:
+            left, right = args
+
+            if functor == '+':
+                return left + right
+            elif functor == '-':
+                return left - right
+            elif functor == '*':
+                return left * right
+            elif functor == '/':
+                if right == 0:
+                    raise ZeroDivisionError()
+                return left / right
+            elif functor == '//':
+                if right == 0:
+                    raise ZeroDivisionError()
+                return int(left // right)
+            elif functor == 'mod':
+                if right == 0:
+                    raise ZeroDivisionError()
+                return left % right
+            elif functor == '**':
+                # Check for undefined cases
+                if left == 0 and right < 0:
+                    raise ValueError("0 ** negative")
+                if left < 0 and not isinstance(right, int):
+                    raise ValueError("negative ** float")
+                try:
+                    return left ** right
+                except OverflowError:
+                    raise
+            elif functor == 'min':
+                return min(left, right)
+            elif functor == 'max':
+                return max(left, right)
+            else:
+                raise ValueError(f"Unknown binary operator: {functor}")
+
+        raise ValueError(f"Invalid arity for {functor}")
+
+    # Keep the old method for backward compatibility during transition
     @staticmethod
     def _eval_arithmetic(
         expr: Any, subst: Substitution, engine: PrologEngine
     ) -> int | float | None:
-        expr = deref(expr, subst)
-
-        if isinstance(expr, Number):
-            return expr.value
-
-        if isinstance(expr, Compound):
-            if expr.functor == "-" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return -arg
-
-            if (
-                expr.functor in ["+", "-", "*", "/", "//", "mod", "**"]
-                and len(expr.args) == 2
-            ):
-                left = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                right = ArithmeticBuiltins._eval_arithmetic(expr.args[1], subst, engine)
-
-                if left is None or right is None:
-                    return None
-
-                try:
-                    if expr.functor == "+":
-                        return left + right
-                    if expr.functor == "-":
-                        return left - right
-                    if expr.functor == "*":
-                        return left * right
-                    if expr.functor == "/":
-                        return left / right
-                    if expr.functor == "//":
-                        return left // right
-                    if expr.functor == "mod":
-                        return left % right
-                    if expr.functor == "**":
-                        return left**right
-                except ZeroDivisionError:
-                    return None
-
-            # Binary math functions
-            BINARY_MATH_FUNCTIONS = {"min": min, "max": max}
-            if expr.functor in BINARY_MATH_FUNCTIONS and len(expr.args) == 2:
-                left = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                right = ArithmeticBuiltins._eval_arithmetic(expr.args[1], subst, engine)
-                if left is None or right is None:
-                    return None
-                return BINARY_MATH_FUNCTIONS[expr.functor](left, right)
-
-            # Unary math functions
-            if expr.functor == "abs" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return abs(arg)
-
-            if expr.functor == "sqrt" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                try:
-                    return math.sqrt(arg)
-                except (ValueError, TypeError):
-                    return None
-
-            if expr.functor == "sin" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return math.sin(arg)
-
-            if expr.functor == "cos" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return math.cos(arg)
-
-            if expr.functor == "tan" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return math.tan(arg)
-
-            if expr.functor == "exp" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                try:
-                    return math.exp(arg)
-                except OverflowError:
-                    return None
-
-            if expr.functor == "log" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                try:
-                    return math.log(arg)
-                except (ValueError, TypeError):
-                    return None
-
-            if expr.functor == "floor" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return math.floor(arg)
-
-            if expr.functor == "ceiling" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return math.ceil(arg)
-
-            if expr.functor == "round" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                return round(arg)
-
-            if expr.functor == "sign" and len(expr.args) == 1:
-                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
-                if arg is None:
-                    return None
-                if arg > 0:
-                    return 1
-                elif arg < 0:
-                    return -1
-                else:
-                    return 0
-
-        return None
+        """Legacy method - use _evaluate_arithmetic instead."""
+        try:
+            return ArithmeticBuiltins._evaluate_arithmetic(expr, subst, engine)
+        except PrologThrow:
+            return None
 
 
 __all__ = ["ArithmeticBuiltins"]
