@@ -20,6 +20,7 @@ from vibeprolog.parser import (
 from vibeprolog.operators import OperatorTable
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution
+from vibeprolog.dcg import expand_dcg_clause
 
 
 class Module:
@@ -91,22 +92,36 @@ class PrologInterpreter:
 
         for item in items:
             if isinstance(item, Clause):
+                # Expand DCG clauses before adding
+                if item.dcg:
+                    expanded_clause = expand_dcg_clause(item.head, item.body)
+                    # Create a new clause with the expanded form, preserving doc and meta
+                    processed_clause = Clause(
+                        head=expanded_clause.args[0],  # Head of the :- clause
+                        body=[expanded_clause.args[1]],  # Body of the :- clause
+                        doc=item.doc,
+                        meta=item.meta,
+                        dcg=False  # Mark as no longer DCG
+                    )
+                else:
+                    processed_clause = item
+
                 # Associate clause with current module context
-                item.module = self.current_module
+                processed_clause.module = self.current_module
 
                 last_predicate = self._add_clause(
-                    item, source_name, closed_predicates, last_predicate
+                    processed_clause, source_name, closed_predicates, last_predicate
                 )
                 # Store PlDoc if present
-                if item.doc:
-                    head = item.head
+                if processed_clause.doc:
+                    head = processed_clause.head
                     if isinstance(head, Compound):
                         key = (head.functor, len(head.args))
                     elif isinstance(head, Atom):
                         key = (head.name, 0)
                     else:
                         continue
-                    self.predicate_docs[key] = item.doc
+                    self.predicate_docs[key] = processed_clause.doc
             elif isinstance(item, Directive):
                 self._handle_directive(item, closed_predicates, source_name)
                 # Store PlDoc for directives if needed
