@@ -181,16 +181,29 @@ class PrologEngine:
             return iter(())
         # Prefer indexed predicates if available
         preds = getattr(module, "predicates", {}).get(key, [])
+        cut_executed = False
         for clause in preds:
+            if cut_executed:
+                break
+
             renamed_clause = self._rename_variables(clause)
             new_subst = unify(inner_goal, renamed_clause.head, subst)
             if new_subst is not None:
                 body_goals = [] if renamed_clause.is_fact() else self._flatten_body(renamed_clause.body)
-                if renamed_clause.is_fact():
-                    yield from self._solve_goals(remaining_goals, new_subst)
-                else:
-                    new_goals = body_goals + remaining_goals
-                    yield from self._solve_goals(new_goals, new_subst)
+                clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
+                try:
+                    if renamed_clause.is_fact():
+                        yield from self._solve_goals(remaining_goals, new_subst)
+                    else:
+                        new_goals = body_goals + remaining_goals
+                        yield from self._solve_goals(new_goals, new_subst)
+                except CutException:
+                    if clause_has_cut:
+                        cut_executed = True
+                    else:
+                        raise
+                except PrologThrow:
+                    raise
 
     def _try_builtin(
         self, goal: Compound, subst: Substitution

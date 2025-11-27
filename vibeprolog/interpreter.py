@@ -308,13 +308,7 @@ class PrologInterpreter:
 
         # Register clause under module if present
         module_name = getattr(clause, "module", "user")
-        if module_name not in self.modules:
-            # Ensure a user module exists by default
-            if module_name == "user":
-                self.modules.setdefault("user", Module("user", None))
-            else:
-                # Create a module with empty exports if it wasn't declared
-                self.modules.setdefault(module_name, Module(module_name, set()))
+        self.modules.setdefault(module_name, Module(module_name, set()))
 
         mod = self.modules[module_name]
         mod.predicates.setdefault(key, []).append(clause)
