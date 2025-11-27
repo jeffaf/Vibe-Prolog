@@ -38,6 +38,8 @@ class PrologEngine:
         predicate_docs: dict[tuple[str, int], str] | None = None,
     ):
         self.clauses = clauses
+        # Explicit dependency so engine can reference interpreter state if needed
+        self.interpreter = None
         self.argv = argv or []
         self.call_depth = 0
         self.max_depth = 1000  # Prevent infinite recursion

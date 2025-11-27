@@ -12,6 +12,7 @@ from vibeprolog.engine import CutException, PrologEngine
 from vibeprolog.parser import (
     Clause,
     Directive,
+    List as ParserList,
     PredicateIndicator,
     PredicatePropertyDirective,
     PrologParser,
@@ -105,14 +106,14 @@ class PrologInterpreter:
                         continue
                     self.predicate_docs[key] = item.doc
             elif isinstance(item, Directive):
-                self._handle_directive(item, closed_predicates)
+                self._handle_directive(item, closed_predicates, source_name)
                 # Store PlDoc for directives if needed
                 if item.doc:
                     # For now, ignore directive docs
                     pass
 
     def _handle_directive(
-        self, directive: Directive, closed_predicates: set[tuple[str, int]]
+        self, directive: Directive, closed_predicates: set[tuple[str, int]], source_name=None
     ):
         """Handle a directive."""
         goal = directive.goal
@@ -128,8 +129,7 @@ class PrologInterpreter:
 
             # Parse export list (should be a List AST)
             exports = set()
-            file_source = None
-            from vibeprolog.parser import List as ParserList
+            file_source = source_name
 
             if isinstance(exports_term, ParserList):
                 for elt in exports_term.elements:
