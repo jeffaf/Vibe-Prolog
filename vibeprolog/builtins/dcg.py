@@ -31,13 +31,19 @@ class DCGBuiltins:
         """
         rule_set, input_list = args
 
+        # Validate the rule set before use
+        engine._check_instantiated(rule_set, subst, "phrase/2")
+        engine._check_type(rule_set, (Atom, Compound), "callable", subst, "phrase/2")
+
+        rule_set_deref = deref(rule_set, subst)
+
         # phrase(RuleSet, List) ≡ RuleSet(List, [])
         empty_list = List(elements=(), tail=None)
-        if isinstance(rule_set, Atom):
-            goal = Compound(rule_set.name, (input_list, empty_list))
+        if isinstance(rule_set_deref, Atom):
+            goal = Compound(rule_set_deref.name, (input_list, empty_list))
         else:
             # Handle compound rule sets
-            goal = Compound(rule_set.functor, rule_set.args + (input_list, empty_list))
+            goal = Compound(rule_set_deref.functor, rule_set_deref.args + (input_list, empty_list))
 
         # Check if the predicate exists before calling it
         engine._check_predicate_exists(goal, "phrase/2")
@@ -55,12 +61,18 @@ class DCGBuiltins:
         """
         rule_set, input_list, rest = args
 
+        # Validate the rule set before use
+        engine._check_instantiated(rule_set, subst, "phrase/3")
+        engine._check_type(rule_set, (Atom, Compound), "callable", subst, "phrase/3")
+
+        rule_set_deref = deref(rule_set, subst)
+
         # phrase(RuleSet, List, Rest) ≡ RuleSet(List, Rest)
-        if isinstance(rule_set, Atom):
-            goal = Compound(rule_set.name, (input_list, rest))
+        if isinstance(rule_set_deref, Atom):
+            goal = Compound(rule_set_deref.name, (input_list, rest))
         else:
             # Handle compound rule sets
-            goal = Compound(rule_set.functor, rule_set.args + (input_list, rest))
+            goal = Compound(rule_set_deref.functor, rule_set_deref.args + (input_list, rest))
 
         # Check if the predicate exists before calling it
         engine._check_predicate_exists(goal, "phrase/3")

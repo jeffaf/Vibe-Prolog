@@ -77,7 +77,7 @@ class PrologInterpreter:
             if isinstance(item, Clause):
                 # Expand DCG clauses before adding
                 if item.dcg:
-                    expanded_clause = expand_dcg_clause(item.head, item.body or [])
+                    expanded_clause = expand_dcg_clause(item.head, item.body)
                     # Create a new clause with the expanded form, preserving doc and meta
                     processed_clause = Clause(
                         head=expanded_clause.args[0],  # Head of the :- clause
