@@ -117,6 +117,20 @@ class PrologError:
         return PrologError._create_error_with_context(error_term, context)
 
     @staticmethod
+    def evaluation_error(error_type: str, context: str | None = None) -> "Compound":
+        """Create an evaluation_error term.
+
+        Args:
+            error_type: The type of evaluation error (e.g., 'zero_divisor', 'undefined', 'float_overflow', 'underflow')
+            context: Name of the predicate that caused the error
+
+        Returns:
+            error(evaluation_error(ErrorType), context(Predicate))
+        """
+        error_term = Compound('evaluation_error', (Atom(error_type),))
+        return PrologError._create_error_with_context(error_term, context)
+
+    @staticmethod
     def permission_error(operation: str, permission_type: str, culprit: Any, context: str | None = None) -> "Compound":
         """Create a permission_error term.
 

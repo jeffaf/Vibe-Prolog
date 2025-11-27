@@ -7,11 +7,17 @@ These goals are what we are working towards in this project:
 - Scalable: It should be able to run large prolog programs
 
 # Coding rules
-- Follow PEP8
+- Follow PEP 8 for Python code
   - **All imports must be at the top of the file** (after module docstring, before other code)
   - Never use `import` statements inside functions or methods
   - Group imports: standard library, third-party, local (separated by blank lines)
 - Run all tests before pushing a PR
+- Use type hints where helpful
+- Add docstrings to all public methods
+- Keep functions focused and testable
+- Use descriptive variable names
+
+
 
 # Prolog Interpreter - Development Guide
 
@@ -27,6 +33,19 @@ See @FEATURES.md
 
 You must keep ./FEATURES.md up to date when you add or change these
 
+## Error Handling 
+
+Handle Prolog errors like this:
+```python
+   except PrologThrow:
+      # Re-raise Prolog errors
+      raise
+   except Exception: # Or use a more specific Exception if possible
+      # Unexpected errors - convert to evaluation error
+      raise PrologThrow(PrologError.evaluation_error("error", f"{op}/2"))
+```
+
+
 
 ## Testing Guidelines
 
@@ -38,11 +57,13 @@ You must keep ./FEATURES.md up to date when you add or change these
 - **Integration tests**: `test_<feature>.py` - Tests for features spanning multiple modules
 - **Fixtures**: `*.pl` files - Prolog code used by tests
 
+
 ### Test File Naming
 
 - Python test files: `test_*.py`
 - Prolog fixtures: `test_*.pl` or descriptive names like `minimal_mi_test.pl`
 - Follow pytest conventions
+
 
 ### Writing Tests
 
@@ -79,6 +100,7 @@ You must keep ./FEATURES.md up to date when you add or change these
        prolog = PrologInterpreter()
        assert not prolog.has_solution("1 = 2")
    ```
+
 
 ### Running Tests
 
@@ -143,18 +165,6 @@ This is standard ISO prolog implementation. The parser should parse standard pro
    print(result)
    ```
 
-## Known Issues
-
-
-## Code Style
-
-- Follow PEP 8 for Python code
-  - **Imports**: Always place all imports at the top of the file, never inside functions
-  - **Import order**: Group standard library, third-party, then local imports (separated by blank lines)
-- Use type hints where helpful
-- Add docstrings to all public methods
-- Keep functions focused and testable
-- Use descriptive variable names
 
 ## Resources
 

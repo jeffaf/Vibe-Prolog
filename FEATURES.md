@@ -231,7 +231,9 @@
 - ✅ Type errors for incorrect argument types
 - ✅ Domain errors for values outside valid domains
 - ✅ Syntax errors for parse failures
+- ✅ Evaluation errors for arithmetic operations (zero_divisor, undefined, float_overflow)
 - ✅ Error context with predicate information
+- ✅ Full ISO compliance for arithmetic error handling
 
 ## Data Types
 - ✅ Atoms
