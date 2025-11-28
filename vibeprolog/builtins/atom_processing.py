@@ -61,11 +61,13 @@ class AtomProcessingBuiltins:
 
         # Mode 2: atom_chars(?Atom, +Chars) - construct atom from chars
         elif isinstance(chars_term, List):
-            # Check if it's a proper list of characters
-            if chars_term.tail is not None:
+            # Collect all elements from the list (handle nested representation)
+            elements = AtomProcessingBuiltins._flatten_prolog_list(chars_term)
+            if elements is None:
                 return  # Not a proper list
+
             char_str = ""
-            for elem in chars_term.elements:
+            for elem in elements:
                 if not isinstance(elem, Atom) or len(elem.name) != 1:
                     return  # Invalid character
                 char_str += elem.name
@@ -73,6 +75,28 @@ class AtomProcessingBuiltins:
             new_subst = unify(atom_term, result_atom, subst)
             if new_subst is not None:
                 yield new_subst
+
+    @staticmethod
+    def _flatten_prolog_list(term) -> list | None:
+        """Flatten a Prolog list into a Python list of elements.
+
+        Returns None if the term is not a proper list.
+        """
+        if not isinstance(term, List):
+            return None
+
+        elements = []
+        current = term
+        while isinstance(current, List):
+            elements.extend(current.elements)
+            if current.tail is None:
+                break
+            current = current.tail
+        else:
+            # Not a proper list
+            return None
+
+        return elements
 
     @staticmethod
     def _is_char_list(term) -> bool:
@@ -118,11 +142,13 @@ class AtomProcessingBuiltins:
 
         # Mode 2: atom_codes(?Atom, +Codes) - construct atom from codes
         elif isinstance(codes_term, List):
-            # Check if it's a proper list of integers
-            if codes_term.tail is not None:
+            # Collect all elements from the list (handle nested representation)
+            elements = AtomProcessingBuiltins._flatten_prolog_list(codes_term)
+            if elements is None:
                 return  # Not a proper list
+
             char_str = ""
-            for elem in codes_term.elements:
+            for elem in elements:
                 if not isinstance(elem, Number) or not isinstance(elem.value, int):
                     return  # Invalid integer
                 char_str += chr(int(elem.value))
