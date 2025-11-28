@@ -217,8 +217,10 @@ class PrologTransformer(Transformer):
                     goal = PredicatePropertyDirective(goal.functor, tuple(indicators))
                 else:
                     goal = PredicatePropertyDirective(goal.functor, (indicators,))
-        # Check if it's a non-parenthesized form like dynamic foo/1
-        elif isinstance(goal, Compound) and goal.functor == "," and len(goal.args) == 2 and isinstance(goal.args[0], Atom) and goal.args[0].name in ("dynamic", "multifile", "discontiguous"):
+        # Check for a comma-separated directive form like `:- dynamic, foo/1.`
+        elif (isinstance(goal, Compound) and goal.functor == "," and len(goal.args) == 2 and
+              isinstance(goal.args[0], Atom) and
+              goal.args[0].name in ("dynamic", "multifile", "discontiguous")):
             property_name = goal.args[0].name
             rest = goal.args[1]
             indicators = self._extract_indicators_from_conjunction(rest)
