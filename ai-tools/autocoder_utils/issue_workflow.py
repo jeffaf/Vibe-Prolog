@@ -16,6 +16,18 @@ from . import (
     run,
     stage_changes,
 )
+def _checkout_and_get_current_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
+    """Helper: refresh, then checkout/create branch as needed and return current branch name."""
+    # Refresh
+    run(["git", "pull"], capture_output=False)
+    # Get current branch
+    current_branch = run(["git", "branch", "--show-current"]).strip()
+    if config.use_new_branch:
+        # Always create a new branch for the issue
+        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
+        return run(["git", "branch", "--show-current"]).strip()
+    return current_branch
+
 
 
 @dataclass(frozen=True)
@@ -32,6 +44,8 @@ class IssueWorkflowConfig:
     session_dir: Path | None = None
     use_json_output: bool = False
     input_instruction: str | None = None
+    use_new_branch: bool = False
+    existing_branch: str | None = None
 
     def required_cmds(self) -> list[str]:
         """Commands that must be present before executing the workflow."""
@@ -100,6 +114,15 @@ def create_branch_name(issue_number: str, issue_content: str, config: IssueWorkf
 
     normalized = run(["git", "check-ref-format", "--normalize", temp_branch_name]).strip()
     return normalized
+
+
+def get_or_create_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
+    """Get existing branch or create a new one for the given issue, returning the
+    name of the branch that is checked out.
+    
+    Logic refactored to use a helper to remove duplication across code paths.
+    """
+    return _checkout_and_get_current_branch(issue_number, config)
 
 
 def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
@@ -284,8 +307,7 @@ def run_issue_workflow(issue_number: str, config: IssueWorkflowConfig) -> None:
     if config.input_instruction:
         tool_input = f"{config.input_instruction}\n\n{issue_content}"
 
-    branch_name = create_branch_name(issue_number, issue_content, config)
-    run(["git", "checkout", "-b", branch_name], capture_output=False)
+    branch_name = get_or_create_branch(issue_number, config)
 
     run_tool(tool_input, config)
     stage_changes()
