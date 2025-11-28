@@ -86,7 +86,11 @@ PROLOG_GRAMMAR = r"""
     fact: term "."
     rule: term ":-" goals "."
     dcg_rule: term "-->" goals "."
-    directive: ":-" (property_directive | term) "."
+    directive: ":-" (prefix_directive | property_directive | term) "."
+
+    prefix_directive: "dynamic" predicate_indicators -> dynamic_directive
+        | "multifile" predicate_indicators -> multifile_directive
+        | "discontiguous" predicate_indicators -> discontiguous_directive
 
     property_directive: "dynamic" "(" predicate_indicators ")"    -> dynamic_directive
         | "multifile" "(" predicate_indicators ")"   -> multifile_directive
@@ -143,7 +147,6 @@ PROLOG_GRAMMAR = r"""
 
     COMP_OP: "=.." | "is" | "=" | "\\=" | "=:=" | "=\=" | "<" | ">" | "=<" | ">=" | "==" | "\\==" | "@<" | "@=<" | "@>" | "@>="
     OPERATOR_ATOM: ":-" | "-->"
-    PREFIX_OP.3: "\\+" | "+" | "-"
     ADD_OP: "+" | "-"
     POW_OP.2: "**"
     MUL_OP: "*" | "/" | "//" | "mod"
@@ -179,6 +182,7 @@ PROLOG_GRAMMAR = r"""
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
     SPECIAL_ATOM_OPS.5: /-\$/
+    PREFIX_OP.3: "\\+" | "+" | "-"
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
 
     VARIABLE: /[A-Z_][a-zA-Z0-9_]*/
@@ -204,19 +208,45 @@ class PrologTransformer(Transformer):
 
     @v_args(meta=True)
     def directive(self, meta, items):
-        return Directive(goal=items[0], meta=meta)
+        goal = items[0]
+        # Check if it's a parenthesized form like dynamic(foo/1)
+        if isinstance(goal, Compound) and goal.functor in ("dynamic", "multifile", "discontiguous"):
+            if len(goal.args) == 1:
+                indicators = goal.args[0]
+                if isinstance(indicators, list):
+                    goal = PredicatePropertyDirective(goal.functor, tuple(indicators))
+                else:
+                    goal = PredicatePropertyDirective(goal.functor, (indicators,))
+        # Check if it's a non-parenthesized form like dynamic foo/1
+        elif isinstance(goal, Compound) and goal.functor == "," and len(goal.args) == 2 and isinstance(goal.args[0], Atom) and goal.args[0].name in ("dynamic", "multifile", "discontiguous"):
+            property_name = goal.args[0].name
+            rest = goal.args[1]
+            indicators = self._extract_indicators_from_conjunction(rest)
+            goal = PredicatePropertyDirective(property_name, tuple(indicators))
+        return Directive(goal=goal, meta=meta)
 
     def predicate_indicators(self, items):
         return items
 
     def dynamic_directive(self, items):
-        return PredicatePropertyDirective("dynamic", tuple(items[0]))
+        indicators = items[0]
+        return PredicatePropertyDirective("dynamic", tuple(indicators))
 
     def multifile_directive(self, items):
-        return PredicatePropertyDirective("multifile", tuple(items[0]))
+        indicators = items[0]
+        return PredicatePropertyDirective("multifile", tuple(indicators))
 
     def discontiguous_directive(self, items):
-        return PredicatePropertyDirective("discontiguous", tuple(items[0]))
+        indicators = items[0]
+        return PredicatePropertyDirective("discontiguous", tuple(indicators))
+
+    def _extract_indicators_from_conjunction(self, term):
+        if isinstance(term, Compound) and term.functor == ",":
+            left = self._extract_indicators_from_conjunction(term.args[0])
+            right = self._extract_indicators_from_conjunction(term.args[1])
+            return left + right
+        else:
+            return [term]
 
     @v_args(meta=True)
     def fact(self, meta, items):
@@ -532,7 +562,7 @@ class PrologParser:
 
     def __init__(self, operator_table=None):
         self.parser = Lark(
-            PROLOG_GRAMMAR, parser="lalr", propagate_positions=True
+            PROLOG_GRAMMAR, parser="earley", propagate_positions=True, ambiguity='resolve'
         )
         # operator_table is reserved for future dynamic operator parsing; currently unused
         self.operator_table = operator_table
