@@ -86,7 +86,8 @@ class TestFirstArgIndexing:
         # Query with ground first arg should check both indexed and unindexed
         result = prolog.query_once("pred(a, Y)")
         assert result is not None
-        assert result['Y'] == 1
+        # Verify the first solution matches the expected binding for Y
+        assert result == {'Y': 1}
 
     def test_dynamic_assert_updates_index(self):
         """Asserted clauses should be indexed."""

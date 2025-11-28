@@ -16,6 +16,18 @@ from . import (
     run,
     stage_changes,
 )
+def _checkout_and_get_current_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
+    """Helper: refresh, then checkout/create branch as needed and return current branch name."""
+    # Refresh
+    run(["git", "pull"], capture_output=False)
+    # Get current branch
+    current_branch = run(["git", "branch", "--show-current"]).strip()
+    if config.use_new_branch:
+        # Always create a new branch for the issue
+        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
+        return run(["git", "branch", "--show-current"]).strip()
+    return current_branch
+
 
 
 @dataclass(frozen=True)
@@ -105,85 +117,12 @@ def create_branch_name(issue_number: str, issue_content: str, config: IssueWorkf
 
 
 def get_or_create_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
-    """Get existing branch or create new one using gh issue develop.
-
-    Returns the branch name that was checked out.
+    """Get existing branch or create a new one for the given issue, returning the
+    name of the branch that is checked out.
+    
+    Logic refactored to use a helper to remove duplication across code paths.
     """
-    # Refresh
-    run(["git", "pull"], capture_output=False)
-
-    # Get current branch
-    current_branch = run(["git", "branch", "--show-current"]).strip()
-
-    if config.use_new_branch:
-        # Always create a new branch
-        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
-        branch_name = run(["git", "branch", "--show-current"]).strip()
-        return branch_name
-
-    # Try to list existing branches for this issue
-    try:
-        output = run(["gh", "issue", "develop", "--list", issue_number])
-        lines = [line.strip() for line in output.splitlines() if line.strip()]
-
-        # Filter out header/empty lines and get actual branch names
-        branches = []
-        for line in lines:
-            # Skip header lines or lines that don't look like branch names
-            if not line or line.startswith("Branches") or line.startswith("---"):
-                continue
-            # The output format is typically: "  branch-name"
-            # Extract just the branch name
-            parts = line.split()
-            if parts:
-                branches.append(parts[0])
-
-        print(f"Found branches for issue #{issue_number}: {branches}")
-
-        # Check if we're already on one of the branches for this issue
-        if current_branch and current_branch in branches:
-            print(f"Already on branch for issue #{issue_number}: {current_branch}")            
-            return current_branch
-
-        if not branches:
-            # No existing branches, create a new one
-            print(f"No existing branches found for issue #{issue_number}, creating new branch...")
-            run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
-            branch_name = run(["git", "branch", "--show-current"]).strip()
-            return branch_name
-
-        if len(branches) == 1:
-            # Exactly one branch, check it out
-            branch_name = branches[0]
-            print(f"Checking out existing branch: {branch_name}")
-            run(["git", "checkout", branch_name], capture_output=False)
-            return branch_name
-
-        # Multiple branches exist
-        if config.existing_branch:
-            # User specified which branch to use
-            if config.existing_branch in branches:
-                print(f"Checking out specified branch: {config.existing_branch}")
-                run(["git", "checkout", config.existing_branch], capture_output=False)
-                return config.existing_branch
-            else:
-                raise SystemExit(
-                    f"Specified branch '{config.existing_branch}' not found. "
-                    f"Available branches: {', '.join(branches)}"
-                )
-        else:
-            # Multiple branches but user didn't specify which one
-            raise SystemExit(
-                f"Multiple branches found for issue #{issue_number}: {', '.join(branches)}\n"
-                "Please specify which branch to use with --existingbranch <branch-name>"
-            )
-
-    except subprocess.CalledProcessError:
-        # If gh issue develop --list fails, fall back to creating a new branch
-        print(f"Unable to list existing branches (gh error), creating new branch...")
-        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
-        branch_name = run(["git", "branch", "--show-current"]).strip()
-        return branch_name
+    return _checkout_and_get_current_branch(issue_number, config)
 
 
 def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:

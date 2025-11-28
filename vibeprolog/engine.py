@@ -448,52 +448,45 @@ class PrologEngine:
             pass
 
     def _get_indexed_clauses(self, functor: str, arity: int, goal: Compound | Atom) -> list[Clause]:
-        """Get clauses relevant to goal using first-argument index.
-
-        Args:
-            functor: Predicate functor
-            arity: Predicate arity
-            goal: The goal term being solved
-
-        Returns:
-            List of clauses to try (already filtered by first argument)
+        """Get clauses relevant to goal using first-argument index while preserving order.
+        If first argument is ground, try indexed buckets; if variable, gather all for this predicate
+        in a way that preserves the original clause ordering.
         """
-        # Check if predicate has any clauses
+        # If there are no clauses for this predicate, return empty
         if (functor, arity) not in self._predicate_index:
             return []
 
-        # If arity is 0, return all clauses for this functor
+        clauses_to_try: list[Clause] = []
+
+        # If arity is 0, return all zero-arity clauses for this functor (preserve order)
         if arity == 0:
-            return [clause for clause in self.clauses
-                    if (isinstance(clause.head, Atom) and clause.head.name == functor)]
+            for c in self.clauses:
+                if isinstance(c.head, Atom) and c.head.name == functor:
+                    clauses_to_try.append(c)
+            return clauses_to_try
 
-        # Get first argument of goal
-        first_arg = goal.args[0] if len(goal.args) > 0 else None
-
-        # Generate index key
+        # Get first argument of goal (may be None if not structured)
+        first_arg = goal.args[0] if isinstance(goal, Compound) and len(goal.args) > 0 else None
         index_key = self._make_index_key(functor, arity, first_arg)
 
-        clauses_to_try = []
-
+        clause_indices: list[int] = []
         if index_key is not None:
-            # Goal has ground first argument - use index
             if index_key in self._first_arg_index:
-                clause_indices = self._first_arg_index[index_key]
-                clauses_to_try.extend(self.clauses[i] for i in clause_indices)
+                clause_indices.extend(self._first_arg_index[index_key])
         else:
-            # Goal has variable first argument - must try all clauses
-            # Include both indexed and non-indexed clauses
-            for key, clause_indices in self._first_arg_index.items():
+            # Variable first argument: gather all clause indices for this (functor, arity)
+            for key, idxs in self._first_arg_index.items():
                 if key[0] == functor and key[1] == arity:
-                    clauses_to_try.extend(self.clauses[i] for i in clause_indices)
+                    clause_indices.extend(idxs)
 
         # Always include clauses with variable first arguments (fallback)
         fallback_key = (functor, arity)
         if fallback_key in self._variable_first_arg_clauses:
-            clause_indices = self._variable_first_arg_clauses[fallback_key]
-            clauses_to_try.extend(self.clauses[i] for i in clause_indices)
+            clause_indices.extend(self._variable_first_arg_clauses[fallback_key])
 
-        return clauses_to_try
+        # Deduplicate and sort to preserve original clause order
+        unique_indices = sorted(set(clause_indices))
+        return [self.clauses[i] for i in unique_indices]
 
     def _register_builtin(
         self, functor: str, arity: int, registry: BuiltinRegistry, handler: Callable

@@ -116,6 +116,7 @@ The index maps first argument patterns to clause lists:
 
 _first_arg_index = {
     # Values are lists of integer indices into the engine's main clause list
+    # (i.e., clause indices, not clause objects)
     ('person', 2, 'atom', 'alice'): [0, 5],
     ('person', 2, 'atom', 'bob'): [8],
     ('age', 2, 'number', 25): [12],
@@ -124,6 +125,7 @@ _first_arg_index = {
 
 _variable_first_arg_clauses = {
     # Stores indices for clauses with a variable as the first argument
+    # (i.e., clause indices into the engine's main clause list)
     ('person', 2): [15, 21],
     # ...
 }
