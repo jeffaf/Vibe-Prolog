@@ -88,4 +88,5 @@ __all__ = [
     "BuiltinRegistry",
     "register_builtin",
     "adapt_old_handler",
+    "AtomProcessingBuiltins",
 ]

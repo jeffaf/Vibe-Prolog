@@ -310,6 +310,7 @@ class PrologEngine:
         from vibeprolog.builtins import (
             all_solutions,
             arithmetic,
+            atom_processing,
             control,
             database,
             dcg,
@@ -326,6 +327,7 @@ class PrologEngine:
         for module in [
             type_tests.TypeTestBuiltins,
             arithmetic.ArithmeticBuiltins,
+            atom_processing.AtomProcessingBuiltins,
             io.IOBuiltins,
             list_ops.ListOperationsBuiltins,
             term_manipulation.TermManipulationBuiltins,
