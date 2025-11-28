@@ -62,14 +62,8 @@ class AtomProcessingBuiltins:
         # Mode 2: atom_chars(?Atom, +Chars) - construct atom from chars
         elif isinstance(chars_term, List):
             # Collect all elements from the list (handle nested representation)
-            elements = []
-            current = chars_term
-            while isinstance(current, List):
-                elements.extend(current.elements)
-                if current.tail is None:
-                    break
-                current = current.tail
-            else:
+            elements = AtomProcessingBuiltins._flatten_prolog_list(chars_term)
+            if elements is None:
                 return  # Not a proper list
 
             char_str = ""
@@ -127,14 +121,8 @@ class AtomProcessingBuiltins:
         # Mode 2: atom_codes(?Atom, +Codes) - construct atom from codes
         elif isinstance(codes_term, List):
             # Collect all elements from the list (handle nested representation)
-            elements = []
-            current = codes_term
-            while isinstance(current, List):
-                elements.extend(current.elements)
-                if current.tail is None:
-                    break
-                current = current.tail
-            else:
+            elements = AtomProcessingBuiltins._flatten_prolog_list(codes_term)
+            if elements is None:
                 return  # Not a proper list
 
             char_str = ""
