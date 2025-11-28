@@ -61,11 +61,19 @@ class AtomProcessingBuiltins:
 
         # Mode 2: atom_chars(?Atom, +Chars) - construct atom from chars
         elif isinstance(chars_term, List):
-            # Check if it's a proper list of characters
-            if chars_term.tail is not None:
+            # Collect all elements from the list (handle nested representation)
+            elements = []
+            current = chars_term
+            while isinstance(current, List):
+                elements.extend(current.elements)
+                if current.tail is None:
+                    break
+                current = current.tail
+            else:
                 return  # Not a proper list
+
             char_str = ""
-            for elem in chars_term.elements:
+            for elem in elements:
                 if not isinstance(elem, Atom) or len(elem.name) != 1:
                     return  # Invalid character
                 char_str += elem.name
@@ -118,11 +126,19 @@ class AtomProcessingBuiltins:
 
         # Mode 2: atom_codes(?Atom, +Codes) - construct atom from codes
         elif isinstance(codes_term, List):
-            # Check if it's a proper list of integers
-            if codes_term.tail is not None:
+            # Collect all elements from the list (handle nested representation)
+            elements = []
+            current = codes_term
+            while isinstance(current, List):
+                elements.extend(current.elements)
+                if current.tail is None:
+                    break
+                current = current.tail
+            else:
                 return  # Not a proper list
+
             char_str = ""
-            for elem in codes_term.elements:
+            for elem in elements:
                 if not isinstance(elem, Number) or not isinstance(elem.value, int):
                     return  # Invalid integer
                 char_str += chr(int(elem.value))

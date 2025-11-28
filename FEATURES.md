@@ -133,7 +133,7 @@ Status legend:
 | `atom_length/2`  | ✅      | **ISO-required**                         |
 | `atom_concat/3`  | ✅      | **ISO-required**                         |
 | `sub_atom/5`     | ✅      | **ISO-required**                         |
-| `atom_chars/2`   | ✅      | **ISO-required**                         |
+| `atom_chars/2`   | ✅      | **ISO-required** (needed for DCG examples) |
 | `atom_codes/2`   | ✅      | **ISO-required**                         |
 | `char_code/2`    | ✅      | **ISO-required**                         |
 | `number_chars/2` | ❌      | **ISO-required**                         |
