@@ -122,12 +122,7 @@ def term_sort_key(term: Any, subst: Substitution | None = None) -> tuple:
             normalized_elements.extend(current_tail.elements)
             current_tail = deref(current_tail.tail, subst) if current_tail.tail is not None else None
 
-        # Build compound representation
         final_tail = Atom('[]') if current_tail is None else current_tail
-        for elem in reversed(normalized_elements):
-            final_tail = Compound('.', [elem, final_tail])
-
-        # Return sort key of the compound
-        return term_sort_key(final_tail, subst)
+        return (4, tuple(term_sort_key(e, subst) for e in normalized_elements), term_sort_key(final_tail, subst))
 
     return (5, str(term))

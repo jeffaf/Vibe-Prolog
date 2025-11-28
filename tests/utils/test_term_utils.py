@@ -58,10 +58,10 @@ def test_term_sort_key_orders_term_types():
 
     assert isinstance(sorted_terms[0], Variable)
     assert isinstance(sorted_terms[1], Number)
-    assert isinstance(sorted_terms[2], List)  # []
-    assert isinstance(sorted_terms[3], Atom)  # "atom"
-    assert isinstance(sorted_terms[4], List)  # [2]
-    assert isinstance(sorted_terms[5], Compound)  # f(a,1)
+    assert isinstance(sorted_terms[2], Atom)  # "atom"
+    assert isinstance(sorted_terms[3], Compound)  # f(1,a)
+    assert isinstance(sorted_terms[4], List) and sorted_terms[4].elements == ()  # []
+    assert isinstance(sorted_terms[5], List) and sorted_terms[5].elements == (Number(2),)  # [2]
 
 
 def test_term_sort_key_handles_nested_lists():
@@ -73,22 +73,22 @@ def test_term_sort_key_handles_nested_lists():
 
 
 def test_term_sort_key_iso_list_ordering():
-    """Test ISO-compliant term ordering where lists are treated as compounds."""
+    """Test term ordering where lists come after compounds."""
     subst = Substitution()
 
-    # Empty list orders as atom '[]'
+    # Empty list orders after atoms
     empty_list = List(tuple(), None)
     atom_test = Atom("test")
     key_empty = term_sort_key(empty_list, subst)
     key_atom = term_sort_key(atom_test, subst)
-    assert key_empty < key_atom  # [] @< test
+    assert key_empty > key_atom  # [] @> test
 
-    # Non-empty lists order as compounds with functor '.'
+    # Non-empty lists order as lists
     list1 = List((Atom("a"),), None)  # [a]
     list2 = List((Atom("b"),), None)  # [b]
     assert term_sort_key(list1, subst) < term_sort_key(list2, subst)  # [a] @< [b]
 
-    # List length comparison via tail
+    # List length comparison
     list_short = List((Number(1), Number(2)), None)  # [1,2]
     list_long = List((Number(1), Number(2), Number(3)), None)  # [1,2,3]
     assert term_sort_key(list_short, subst) < term_sort_key(list_long, subst)  # [1,2] @< [1,2,3]
@@ -98,11 +98,11 @@ def test_term_sort_key_iso_list_ordering():
     list_1 = List((Number(1),), None)
     assert term_sort_key(compound_fa, subst) < term_sort_key(list_1, subst)  # f(a) @< [1]
 
-    # Mixed: list (as atom '[]') < atom < compound
+    # Mixed: atom < compound < list
     atom_z = Atom("z")
     compound_g = Compound("g", tuple())
     list_empty = List(tuple(), None)
-    assert term_sort_key(list_empty, subst) < term_sort_key(atom_z, subst) < term_sort_key(compound_g, subst)
+    assert term_sort_key(atom_z, subst) < term_sort_key(compound_g, subst) < term_sort_key(list_empty, subst)
 
     # List with tail
     improper_list = List((Atom("x"),), Atom("tail"))  # [x|tail]
