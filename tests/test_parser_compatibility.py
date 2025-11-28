@@ -263,11 +263,12 @@ class TestArithmeticPrecedence:
         """Test unary minus vs binary minus"""
         parser = PrologParser()
         term = parser.parse_term("-X + Y")
-        # Current parser parses as - (X + Y)
+        # Unary minus has higher precedence, so this is (-X) + Y
         assert isinstance(term, Compound)
-        assert term.functor == '-'
+        assert term.functor == '+'
         assert isinstance(term.args[0], Compound)
-        assert term.args[0].functor == '+'
+        assert term.args[0].functor == '-'
+        assert isinstance(term.args[0].args[0], Variable)
 
     def test_mixed_arithmetic(self):
         """Test mixed arithmetic with parentheses"""

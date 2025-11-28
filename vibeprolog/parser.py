@@ -116,9 +116,7 @@ PROLOG_GRAMMAR = r"""
 
     comparison_term: module_term (COMP_OP module_term)?
 
-    prefix_term: PREFIX_OP prefix_term  -> prefix_op
-        | "-" prefix_term  -> prefix_op
-        | expr
+    prefix_term: expr
 
     // Module qualification operator (right-associative, xfy)
     module_term: prefix_term (":" module_term)?
@@ -129,7 +127,11 @@ PROLOG_GRAMMAR = r"""
 
     mul_expr: pow_expr (MUL_OP pow_expr)*
 
-    pow_expr: primary (POW_OP primary)*
+    pow_expr: unary_expr (POW_OP unary_expr)*
+
+    unary_expr: PREFIX_OP unary_expr  -> prefix_op
+        | "-" unary_expr  -> prefix_op
+        | primary
 
     primary: operator_atom
         | compound
@@ -293,11 +295,24 @@ class PrologTransformer(Transformer):
         # items can be [op, term] or just [term] depending on the rule
         if len(items) == 2:
             op, term = items
-            return Compound(str(op), (term,))
+            op_str = str(op)
+            # Special case: convert unary minus applied to a number into a negative number
+            if op_str == "-" and isinstance(term, Number):
+                if isinstance(term.value, int):
+                    return Number(-term.value)
+                else:
+                    return Number(-term.value)
+            return Compound(op_str, (term,))
         else:
             # For "-" prefix_term rule, items is just [term]
             # The "-" is implicit in the rule
             term = items[0]
+            # Special case: convert unary minus applied to a number into a negative number
+            if isinstance(term, Number):
+                if isinstance(term.value, int):
+                    return Number(-term.value)
+                else:
+                    return Number(-term.value)
             return Compound("-", (term,))
 
     def module_term(self, items):
@@ -334,20 +349,23 @@ class PrologTransformer(Transformer):
         return result
 
     def pow_expr(self, items):
-        if len(items) == 1:
-            return items[0]
-        # Build right-associative tree for exponentiation
-        result = items[-1]
-        for i in range(len(items) - 2, -1, -2):
-            if i > 0:
-                result = Compound(str(items[i]), (items[i - 1], result))
-        if len(items) % 2 == 0:
-            # If even number of items, first item hasn't been added yet
-            result = Compound(str(items[1]), (items[0], result))
-        return result
+       if len(items) == 1:
+           return items[0]
+       # Build right-associative tree for exponentiation
+       result = items[-1]
+       for i in range(len(items) - 2, -1, -2):
+           if i > 0:
+               result = Compound(str(items[i]), (items[i - 1], result))
+       if len(items) % 2 == 0:
+           # If even number of items, first item hasn't been added yet
+           result = Compound(str(items[1]), (items[0], result))
+       return result
+
+    def unary_expr(self, items):
+       return items[0]
 
     def primary(self, items):
-        return items[0]
+       return items[0]
 
     def compound(self, items):
         functor = items[0]
