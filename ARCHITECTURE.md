@@ -114,19 +114,19 @@ The index maps first argument patterns to clause lists:
 
 ### Data Structure
 
-```python
 _first_arg_index = {
-    ('person', 2, 'atom', 'alice'): [clause1, clause2],
-    ('person', 2, 'atom', 'bob'): [clause3],
-    ('age', 2, 'number', 25): [clause4],
+    # Values are lists of integer indices into the engine's main clause list
+    ('person', 2, 'atom', 'alice'): [0, 5],
+    ('person', 2, 'atom', 'bob'): [8],
+    ('age', 2, 'number', 25): [12],
     # ...
 }
 
 _variable_first_arg_clauses = {
-    ('person', 2): [clause5, clause6],  # Clauses with variable first arg
+    # Stores indices for clauses with a variable as the first argument
+    ('person', 2): [15, 21],
     # ...
 }
-```
 
 ### Performance Impact
 

@@ -447,7 +447,7 @@ class PrologEngine:
             # Zero-arity predicates don't need indexing
             pass
 
-    def _get_indexed_clauses(self, functor: str, arity: int, goal: Compound) -> list[Clause]:
+    def _get_indexed_clauses(self, functor: str, arity: int, goal: Compound | Atom) -> list[Clause]:
         """Get clauses relevant to goal using first-argument index.
 
         Args:
