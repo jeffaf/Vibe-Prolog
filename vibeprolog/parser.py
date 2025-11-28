@@ -230,13 +230,38 @@ class PrologTransformer(Transformer):
         return items
 
     def dynamic_directive(self, items):
-        return PredicatePropertyDirective("dynamic", tuple(items[0]))
+        indicators = self._flatten_comma_separated(items[0])
+        return PredicatePropertyDirective("dynamic", tuple(indicators))
 
     def multifile_directive(self, items):
-        return PredicatePropertyDirective("multifile", tuple(items[0]))
+        indicators = self._flatten_comma_separated(items[0])
+        return PredicatePropertyDirective("multifile", tuple(indicators))
 
     def discontiguous_directive(self, items):
-        return PredicatePropertyDirective("discontiguous", tuple(items[0]))
+        indicators = self._flatten_comma_separated(items[0])
+        return PredicatePropertyDirective("discontiguous", tuple(indicators))
+
+    def _flatten_comma_separated(self, items):
+        """Flatten comma-separated predicates into a list.
+        
+        If items is a list with a single Compound with functor ',',
+        unwrap it into a flat list of indicators.
+        """
+        if isinstance(items, list) and len(items) == 1:
+            item = items[0]
+            if isinstance(item, Compound) and item.functor == ',':
+                # Flatten comma compound
+                return self._collect_comma_terms(item)
+        return items
+
+    def _collect_comma_terms(self, compound):
+        """Recursively collect terms from a comma compound."""
+        if isinstance(compound, Compound) and compound.functor == ',':
+            left = self._collect_comma_terms(compound.args[0])
+            right = self._collect_comma_terms(compound.args[1])
+            return left + right
+        else:
+            return [compound]
 
     @v_args(meta=True)
     def fact(self, meta, items):
