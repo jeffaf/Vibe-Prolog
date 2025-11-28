@@ -136,8 +136,8 @@ Status legend:
 | `atom_chars/2`   | ✅      | **ISO-required** (needed for DCG examples) |
 | `atom_codes/2`   | ✅      | **ISO-required**                         |
 | `char_code/2`    | ✅      | **ISO-required**                         |
-| `number_chars/2` | ❌      | **ISO-required**                         |
-| `number_codes/2` | ❌      | **ISO-required**                         |
+| `number_chars/2` | ✅      | **ISO-required**                         |
+| `number_codes/2` | ✅      | **ISO-required**                         |
 
 ---
 
