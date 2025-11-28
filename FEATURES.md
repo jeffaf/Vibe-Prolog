@@ -108,6 +108,21 @@ Status legend:
 
 ---
 
+## §8.16 — Atom Processing
+
+| Predicate        | Status | Notes                                    |
+| ---------------- | ------ | ---------------------------------------- |
+| `atom_length/2`  | ❌      | **ISO-required**                         |
+| `atom_concat/3`  | ❌      | **ISO-required**                         |
+| `sub_atom/5`     | ❌      | **ISO-required**                         |
+| `atom_chars/2`   | ❌      | **ISO-required** (needed for DCG examples) |
+| `atom_codes/2`   | ❌      | **ISO-required**                         |
+| `char_code/2`    | ❌      | **ISO-required**                         |
+| `number_chars/2` | ❌      | **ISO-required**                         |
+| `number_codes/2` | ❌      | **ISO-required**                         |
+
+---
+
 ## §9 — Arithmetic
 
 | Feature                           | Status | Notes |
@@ -212,7 +227,7 @@ Status legend:
 | Category               | Status                            |
 | ---------------------- | --------------------------------- |
 | Core execution model   | ✅ Strong                          |
-| Built-ins & arithmetic | ✅ Strong                          |
+| Built-ins & arithmetic | ⚠️ Strong (missing §8.16 atom processing) |
 | Errors & exceptions    | ✅ Strong                          |
 | Parsing & syntax       | ❌ Blocking gaps                   |
 | Modules                | ✅ Largely ISO-consistent (Part 1) |
@@ -226,3 +241,4 @@ Status legend:
 2. `char_conversion/2` missing (§6.4, §7.4)
 3. Incorrect term ordering (§6.4.10)
 4. Module-local clause resolution (§10)
+5. **Atom processing predicates missing (§8.16)** - All 8 predicates unimplemented, breaks DCG examples
