@@ -264,8 +264,10 @@ class DatabaseBuiltins:
         if had_clauses:
             engine._predicate_index.discard((name, arity))
             engine.predicate_sources.pop((name, arity), None)
-            # Clear first-argument index entries
-            engine._clear_predicate_from_index(name, arity)
+            # Clear and rebuild first-argument index since clause indices have shifted
+            engine._first_arg_index.clear()
+            engine._variable_first_arg_clauses.clear()
+            engine._build_first_arg_index()
 
         return subst
 
