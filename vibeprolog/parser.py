@@ -278,7 +278,15 @@ class PrologTransformer(Transformer):
         return Clause(head=head, body=body, dcg=True, meta=meta)
 
     def goals(self, items):
-        return items
+        # Flatten any comma compounds in the goal list
+        # This handles cases where ambiguous parsing creates comma compounds
+        result = []
+        for item in items:
+            if isinstance(item, Compound) and item.functor == ',':
+                result.extend(self._collect_comma_terms(item))
+            else:
+                result.append(item)
+        return result
 
     def term(self, items):
         return items[0]
