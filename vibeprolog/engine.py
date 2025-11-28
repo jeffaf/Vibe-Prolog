@@ -160,7 +160,7 @@ class PrologEngine:
                 return builtin_results
 
             # Delegate clause-search to the module's predicate index when available
-            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals, current_module, depth + 1):
+            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals, current_module, depth):
                 yield result
             return
 
@@ -169,7 +169,7 @@ class PrologEngine:
             try:
                 for new_subst in builtin_results:
                     if new_subst is not None:
-                        yield from self._solve_goals(remaining_goals, new_subst, current_module, depth + 1)
+                        yield from self._solve_goals(remaining_goals, new_subst, current_module, depth)
             except CutException:
                 raise
             except PrologThrow:
@@ -180,12 +180,12 @@ class PrologEngine:
         imported_module = self._check_imported_predicate(current_module, goal)
         if imported_module is not None:
             # Resolve from imported module
-            for result in self._solve_module_predicate(imported_module, None, goal, subst, remaining_goals, current_module, depth + 1):
+            for result in self._solve_module_predicate(imported_module, None, goal, subst, remaining_goals, current_module, depth):
                 yield result
             return
 
         # Try to solve from current module predicates first
-        for result in self._solve_module_predicate(current_module, None, goal, subst, remaining_goals, current_module, depth + 1):
+        for result in self._solve_module_predicate(current_module, None, goal, subst, remaining_goals, current_module, depth):
             yield result
 
         # If no solutions from current module, try global predicates (user module and others)
@@ -219,7 +219,7 @@ class PrologEngine:
                 clause_module = getattr(renamed_clause, 'module', 'user')
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst, clause_module, depth + 1)
+                        yield from self._solve_goals(remaining_goals, new_subst, clause_module, depth)
                     else:
                         new_goals = body_goals + remaining_goals
                         yield from self._solve_goals(new_goals, new_subst, clause_module, depth + 1)
@@ -281,7 +281,7 @@ class PrologEngine:
                 clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst, module_name, depth + 1)
+                        yield from self._solve_goals(remaining_goals, new_subst, module_name, depth)
                     else:
                         new_goals = body_goals + remaining_goals
                         yield from self._solve_goals(new_goals, new_subst, module_name, depth + 1)

@@ -36,7 +36,7 @@ class Module:
 class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
-    def __init__(self, argv: list[str] | None = None, max_recursion_depth: int = 500) -> None:
+    def __init__(self, argv: list[str] | None = None, max_recursion_depth: int = 400) -> None:
         self.operator_table = OperatorTable()
         self.parser = PrologParser(self.operator_table)
         self.clauses = []
