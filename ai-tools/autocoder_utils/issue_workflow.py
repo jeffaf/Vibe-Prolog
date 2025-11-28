@@ -32,6 +32,8 @@ class IssueWorkflowConfig:
     session_dir: Path | None = None
     use_json_output: bool = False
     input_instruction: str | None = None
+    use_new_branch: bool = False
+    existing_branch: str | None = None
 
     def required_cmds(self) -> list[str]:
         """Commands that must be present before executing the workflow."""
@@ -100,6 +102,76 @@ def create_branch_name(issue_number: str, issue_content: str, config: IssueWorkf
 
     normalized = run(["git", "check-ref-format", "--normalize", temp_branch_name]).strip()
     return normalized
+
+
+def get_or_create_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
+    """Get existing branch or create new one using gh issue develop.
+
+    Returns the branch name that was checked out.
+    """
+    if config.use_new_branch:
+        # Always create a new branch
+        output = run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
+        # Extract branch name from current branch
+        branch_name = run(["git", "branch", "--show-current"]).strip()
+        return branch_name
+
+    # Try to list existing branches for this issue
+    try:
+        output = run(["gh", "issue", "develop", "--list", issue_number])
+        lines = [line.strip() for line in output.splitlines() if line.strip()]
+
+        # Filter out header/empty lines and get actual branch names
+        branches = []
+        for line in lines:
+            # Skip header lines or lines that don't look like branch names
+            if not line or line.startswith("Branches") or line.startswith("---"):
+                continue
+            # The output format is typically: "  branch-name"
+            # Extract just the branch name
+            parts = line.split()
+            if parts:
+                branches.append(parts[0])
+
+        if not branches:
+            # No existing branches, create a new one
+            print(f"No existing branches found for issue #{issue_number}, creating new branch...")
+            run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
+            branch_name = run(["git", "branch", "--show-current"]).strip()
+            return branch_name
+
+        if len(branches) == 1:
+            # Exactly one branch, check it out
+            branch_name = branches[0]
+            print(f"Checking out existing branch: {branch_name}")
+            run(["git", "checkout", branch_name], capture_output=False)
+            return branch_name
+
+        # Multiple branches exist
+        if config.existing_branch:
+            # User specified which branch to use
+            if config.existing_branch in branches:
+                print(f"Checking out specified branch: {config.existing_branch}")
+                run(["git", "checkout", config.existing_branch], capture_output=False)
+                return config.existing_branch
+            else:
+                raise SystemExit(
+                    f"Specified branch '{config.existing_branch}' not found. "
+                    f"Available branches: {', '.join(branches)}"
+                )
+        else:
+            # Multiple branches but user didn't specify which one
+            raise SystemExit(
+                f"Multiple branches found for issue #{issue_number}: {', '.join(branches)}\n"
+                "Please specify which branch to use with --existingbranch <branch-name>"
+            )
+
+    except subprocess.CalledProcessError:
+        # If gh issue develop --list fails, fall back to creating a new branch
+        print(f"Unable to list existing branches (gh error), creating new branch...")
+        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
+        branch_name = run(["git", "branch", "--show-current"]).strip()
+        return branch_name
 
 
 def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
@@ -284,8 +356,7 @@ def run_issue_workflow(issue_number: str, config: IssueWorkflowConfig) -> None:
     if config.input_instruction:
         tool_input = f"{config.input_instruction}\n\n{issue_content}"
 
-    branch_name = create_branch_name(issue_number, issue_content, config)
-    run(["git", "checkout", "-b", branch_name], capture_output=False)
+    branch_name = get_or_create_branch(issue_number, config)
 
     run_tool(tool_input, config)
     stage_changes()

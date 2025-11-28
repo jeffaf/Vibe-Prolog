@@ -50,6 +50,16 @@ def _run_issue_workflow(
         default=default_timeout,
         help=f"Seconds before {tool_name} automation times out (default: %(default)s)",
     )
+    parser.add_argument(
+        "--newbranch",
+        action="store_true",
+        help="Always create a new branch for this issue (ignore existing branches)",
+    )
+    parser.add_argument(
+        "--existingbranch",
+        type=str,
+        help="Name of existing branch to use when multiple branches exist for this issue",
+    )
     args = parser.parse_args(arg_list)
     config = IssueWorkflowConfig(
         tool_cmd=tool_cmd,
@@ -59,6 +69,8 @@ def _run_issue_workflow(
         input_instruction=input_instruction,
         session_dir=session_dir,
         use_json_output=use_json_output,
+        use_new_branch=args.newbranch,
+        existing_branch=args.existingbranch,
     )
     run_issue_workflow(args.issue, config)
 
