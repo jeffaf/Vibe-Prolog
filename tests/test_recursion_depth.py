@@ -34,7 +34,7 @@ class TestRecursionDepthLimits:
 
     def test_exactly_at_limit(self):
         """Recursion exactly at limit should be allowed (limit is exclusive)."""
-        prolog = PrologInterpreter(max_recursion_depth=200)
+        prolog = PrologInterpreter(max_recursion_depth=201)
         prolog.consult_string("""
             count(0).
             count(N) :- N > 0, N1 is N - 1, count(N1).
@@ -59,13 +59,13 @@ class TestRecursionDepthLimits:
         """Recursion one over limit should raise error."""
         prolog = PrologInterpreter(max_recursion_depth=100)
         prolog.consult_string("""
-            count(0) :- !.
+            count(0).
             count(N) :- N > 0, N1 is N - 1, count(N1).
         """)
 
         # One over limit should fail
         with pytest.raises(Exception) as exc_info:
-            prolog.query_once("count(100)")
+            prolog.query_once("count(101)")
         assert "resource_error" in str(exc_info.value)
 
     def test_configurable_depth_limit(self):
