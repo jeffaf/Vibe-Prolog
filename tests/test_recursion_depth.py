@@ -85,7 +85,7 @@ class TestRecursionDepthLimits:
 
     def test_mutual_recursion_depth(self):
         """Mutual recursion should count depth correctly."""
-        prolog = PrologInterpreter(max_recursion_depth=50)
+        prolog = PrologInterpreter(max_recursion_depth=30)
         prolog.consult_string("""
             even(0).
             even(N) :- N > 0, N1 is N - 1, odd(N1).
