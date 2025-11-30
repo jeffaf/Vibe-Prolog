@@ -281,6 +281,7 @@ class ListOperationsBuiltins:
         index, lst, elem = args
         index = deref(index, subst)
         lst = deref(lst, subst)
+        elem = deref(elem, subst)
 
         # Do not require lst to be a concrete list here to allow generation (nth0/3)
         try:
@@ -317,7 +318,7 @@ class ListOperationsBuiltins:
                         yield new_subst
 
         # Mode 3: Generate list with element at index
-        elif isinstance(index, Number) and isinstance(index.value, int) and isinstance(elem, Variable):
+        elif isinstance(index, Number) and isinstance(index.value, int):
             idx = index.value
             if idx < 0:
                 raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
@@ -325,14 +326,12 @@ class ListOperationsBuiltins:
                 # If we don't have a concrete list yet, this mode cannot be generated
                 return
             if idx == 0:
-                # [Elem | Tail] where Tail is fresh
                 tail_var = engine._fresh_variable("Tail_")
                 result_list = List((elem,), tail_var)
                 new_subst = unify(lst, result_list, subst)
                 if new_subst is not None:
                     yield new_subst
             else:
-                # Build list with Elem variables followed by the tail
                 prefix = [engine._fresh_variable(f"Elem{i}_") for i in range(idx)]
                 tail_var = engine._fresh_variable("Tail_")
                 elements = tuple(prefix) + (elem,)
@@ -378,14 +377,13 @@ class ListOperationsBuiltins:
         lst, elem = args
         lst = deref(lst, subst)
         elem = deref(elem, subst)
-
+        # InstantiationError if input is unbound
         if isinstance(lst, Variable):
             raise PrologThrow(PrologError.instantiation_error("last/2"))
         if not isinstance(lst, List):
             raise PrologThrow(PrologError.type_error("list", lst, "last/2"))
 
         py_list = list_to_python(lst, subst)
-
         if not py_list:
             return  # Empty list, fail
 
@@ -400,10 +398,11 @@ class ListOperationsBuiltins:
     ) -> Iterator[Substitution]:
         elem, lst, remainder = args
         lst = deref(lst, subst)
+        # InstantiationError if list is unbound
         if isinstance(lst, Variable):
             raise PrologThrow(PrologError.instantiation_error("select/3"))
         if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
+            raise PrologThrow(PrologError.type_error("list", lst, "select/3"))
 
         py_list = list_to_python(lst, subst)
 
@@ -430,7 +429,10 @@ class ListOperationsBuiltins:
         if not isinstance(lst, List):
             raise PrologThrow(PrologError.type_error("list", lst, "memberchk/2"))
 
-        py_list = list_to_python(lst, subst)
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
 
         # Check for first match only (deterministic)
         for item in py_list:
@@ -503,18 +505,17 @@ class ListOperationsBuiltins:
             raise PrologThrow(PrologError.type_error("list", lst, "max_list/2"))
 
         py_list = list_to_python(lst, subst)
-
         if not py_list:
             raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
 
-        # Check all are numbers and collect values
-        # Check all are numbers and find max value in one pass
+        # One-pass max computation
         max_val = None
-        for i, item in enumerate(py_list):
+        for item in py_list:
             if not isinstance(item, Number):
                 raise PrologThrow(PrologError.type_error("number", item))
-            if i == 0 or item.value > max_val:
-                max_val = item.value
+            val = item.value
+            if max_val is None or val > max_val:
+                max_val = val
         new_subst = unify(max_result, Number(max_val), subst)
         if new_subst is not None:
             yield new_subst
@@ -532,18 +533,17 @@ class ListOperationsBuiltins:
             raise PrologThrow(PrologError.type_error("list", lst, "min_list/2"))
 
         py_list = list_to_python(lst, subst)
-
         if not py_list:
             raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
 
-        # Check all are numbers and collect values
-        values = []
+        # One-pass min computation
+        min_val = None
         for item in py_list:
             if not isinstance(item, Number):
                 raise PrologThrow(PrologError.type_error("number", item))
-            values.append(item.value)
-
-        min_val = min(values)
+            val = item.value
+            if min_val is None or val < min_val:
+                min_val = val
         new_subst = unify(min_result, Number(min_val), subst)
         if new_subst is not None:
             yield new_subst
