@@ -536,14 +536,13 @@ class ListOperationsBuiltins:
         if not py_list:
             raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
 
-        # One-pass min computation
+        # Check all are numbers and find min value in one pass
         min_val = None
-        for item in py_list:
+        for i, item in enumerate(py_list):
             if not isinstance(item, Number):
                 raise PrologThrow(PrologError.type_error("number", item))
-            val = item.value
-            if min_val is None or val < min_val:
-                min_val = val
+            if i == 0 or item.value < min_val:
+                min_val = item.value
         new_subst = unify(min_result, Number(min_val), subst)
         if new_subst is not None:
             yield new_subst
