@@ -165,6 +165,14 @@ class TestGround:
 class TestIsList:
     """Tests for is_list/1 predicate."""
 
+    def test_is_list_cyclic_term_fails(self):
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X = [a|X], is_list(X)")
+
+    def test_is_list_atom_terminator_handles_atom(self):
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("T = '[]', is_list([a|T])")
+
     def test_empty_list(self):
         """Test is_list/1 succeeds for empty list."""
         prolog = PrologInterpreter()

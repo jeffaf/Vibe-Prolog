@@ -109,7 +109,7 @@ Status legend:
 | `compound/1` | ✅      |                                      |
 | `callable/1` | ✅      |                                      |
 | `ground/1`   | ✅      |                                      |
-| `is_list/1`  | ✅      | Common extension (de facto standard) |
+| `is_list/1`  | ✅      | Common extension (de facto standard); supports Atom('[]') as list terminator |
 
 ---
 

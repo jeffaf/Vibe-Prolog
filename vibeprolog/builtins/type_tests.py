@@ -144,24 +144,24 @@ class TypeTestBuiltins:
 
     @staticmethod
     def _is_proper_list(term: Any) -> bool:
-        """Check if term is a proper list, handling cycles."""
+        """Check if term is a proper list, handling cycles and Atom('[]') terminator.
+        Uses an iterative approach to avoid recursion depth issues and to correctly
+        treat Atom('[]') as a valid list terminator (extension behavior).
+        """
         visited = set()
-        return TypeTestBuiltins._is_proper_list_recursive(term, visited)
-
-    @staticmethod
-    def _is_proper_list_recursive(term: Any, visited: set) -> bool:
-        term_id = id(term)
-        if term_id in visited:
-            return False  # cycle detected
-        visited.add(term_id)
-        try:
-            if isinstance(term, List):
-                if term.tail is None:
-                    return True
-                return TypeTestBuiltins._is_proper_list_recursive(term.tail, visited)
-            return False
-        finally:
-            visited.remove(term_id)
+        current = term
+        while isinstance(current, List):
+            term_id = id(current)
+            if term_id in visited:
+                return False  # cycle detected
+            visited.add(term_id)
+            if current.tail is None:
+                return True
+            current = current.tail
+        # A proper list can also terminate with the atom '[]'
+        if isinstance(current, Atom) and current.name == "[]":
+            return True
+        return False
 
     @staticmethod
     def _builtin_is_list(
