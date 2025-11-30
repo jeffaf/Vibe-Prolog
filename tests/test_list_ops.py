@@ -548,13 +548,13 @@ class TestListToSet:
         """Test list_to_set with no duplicates."""
         result = prolog.query_once("list_to_set([1,2,3], X).")
         assert result is not None
-        assert set(result['X']) == {1, 2, 3}
+        assert result['X'] == [1, 2, 3]
 
     def test_list_to_set_with_duplicates(self, prolog):
         """Test list_to_set with duplicates."""
         result = prolog.query_once("list_to_set([1,2,1,3,2], X).")
         assert result is not None
-        assert set(result['X']) == {1, 2, 3}
+        assert result['X'] == [1, 2, 3]
 
     def test_list_to_set_preserves_order(self, prolog):
         """Test list_to_set preserves first occurrence order."""

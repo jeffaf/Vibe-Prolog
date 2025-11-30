@@ -7,6 +7,7 @@ length calculation, reversal, and sorting with duplicate removal.
 from __future__ import annotations
 
 from typing import Iterator
+import itertools
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
@@ -625,17 +626,13 @@ class ListOperationsBuiltins:
 
         py_list = list_to_python(lst, subst)
 
-        # Check for duplicates using term equality
-        seen = []
+        # Check for duplicates using term sort key (O(n))
+        seen_keys = set()
         for item in py_list:
-            is_duplicate = False
-            for seen_item in seen:
-                if terms_equal(item, seen_item):
-                    is_duplicate = True
-                    break
-            if is_duplicate:
+            key = term_sort_key(item)
+            if key in seen_keys:
                 return  # Has duplicates, fail
-            seen.append(item)
+            seen_keys.add(key)
 
         # No duplicates found, succeed
         yield subst
@@ -655,19 +652,14 @@ class ListOperationsBuiltins:
 
         py_list = list_to_python(lst, subst)
 
-        # Remove duplicates, preserving first occurrence
+        # Remove duplicates, preserving first occurrence (O(n))
         unique = []
-        seen = []
+        seen_keys = set()
         for item in py_list:
-            is_duplicate = False
-            for seen_item in seen:
-                if terms_equal(item, seen_item):
-                    is_duplicate = True
-                    break
-            if not is_duplicate:
+            key = term_sort_key(item)
+            if key not in seen_keys:
                 unique.append(item)
-                seen.append(item)
-
+                seen_keys.add(key)
         result_list = python_to_list(unique)
         new_subst = unify(result, result_list, subst)
         if new_subst is not None:
@@ -688,24 +680,15 @@ class ListOperationsBuiltins:
 
         py_list = list_to_python(lst, subst)
 
-        # Remove duplicates and sort
+        # Remove duplicates (preserve first) using keys, then sort deterministically
         unique = []
-        seen = []
+        seen_keys = set()
         for item in py_list:
-            is_duplicate = False
-            for seen_item in seen:
-                if terms_equal(item, seen_item):
-                    is_duplicate = True
-                    break
-            if not is_duplicate:
+            key = term_sort_key(item)
+            if key not in seen_keys:
                 unique.append(item)
-                seen.append(item)
-
-        try:
-            sorted_unique = sorted(unique, key=term_sort_key)
-        except TypeError:
-            sorted_unique = unique
-
+                seen_keys.add(key)
+        sorted_unique = sorted(unique, key=term_sort_key)
         result_list = python_to_list(sorted_unique)
         new_subst = unify(result, result_list, subst)
         if new_subst is not None:
@@ -807,7 +790,6 @@ class ListOperationsBuiltins:
         py_list = list_to_python(lst, subst)
 
         # Generate all permutations
-        import itertools
         for perm in itertools.permutations(py_list):
             perm_list = python_to_list(list(perm))
             new_subst = unify(result, perm_list, subst)
