@@ -240,17 +240,14 @@ class ListOperationsBuiltins:
     ) -> Substitution | None:
         lst, sorted_lst = args
         lst = deref(lst, subst)
-
+        # InstantiationError if input is unbound
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("msort/2"))
         if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
+            raise PrologThrow(PrologError.type_error("list", lst, "msort/2"))
 
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
-
+        py_list = list_to_python(lst, subst)
         sorted_py = sorted(py_list, key=term_sort_key)
-
         result = python_to_list(sorted_py)
         return unify(sorted_lst, result, subst)
 
@@ -260,23 +257,20 @@ class ListOperationsBuiltins:
     ) -> Substitution | None:
         pairs, sorted_pairs = args
         pairs = deref(pairs, subst)
-
+        # Instantiation error for unbound input
+        if isinstance(pairs, Variable):
+            raise PrologThrow(PrologError.instantiation_error("keysort/2"))
         if not isinstance(pairs, List):
-            raise PrologThrow(PrologError.type_error("list", pairs))
+            raise PrologThrow(PrologError.type_error("list", pairs, "keysort/2"))
 
-        try:
-            py_list = list_to_python(pairs, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", pairs))
-
-        # Check each element is a Key-Value pair
+        py_list = list_to_python(pairs, subst)
+        # Ensure each element is a Key-Value pair
         for item in py_list:
             if not (isinstance(item, Compound) and item.functor == '-' and len(item.args) == 2):
                 raise PrologThrow(PrologError.type_error("pair", item))
 
         # Sort by key (first argument of the pair)
         sorted_py = sorted(py_list, key=lambda pair: term_sort_key(pair.args[0]))
-
         result = python_to_list(sorted_py)
         return unify(sorted_pairs, result, subst)
 
@@ -287,7 +281,6 @@ class ListOperationsBuiltins:
         index, lst, elem = args
         index = deref(index, subst)
         lst = deref(lst, subst)
-        elem = deref(elem, subst)
 
         # Do not require lst to be a concrete list here to allow generation (nth0/3)
         try:
@@ -328,6 +321,9 @@ class ListOperationsBuiltins:
             idx = index.value
             if idx < 0:
                 raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
+            if py_list is None:
+                # If we don't have a concrete list yet, this mode cannot be generated
+                return
             if idx == 0:
                 # [Elem | Tail] where Tail is fresh
                 tail_var = engine._fresh_variable("Tail_")
@@ -339,7 +335,7 @@ class ListOperationsBuiltins:
                 # Build list with Elem variables followed by the tail
                 prefix = [engine._fresh_variable(f"Elem{i}_") for i in range(idx)]
                 tail_var = engine._fresh_variable("Tail_")
-                elements = tuple(prefix) + (elem, tail_var)
+                elements = tuple(prefix) + (elem,)
                 result_list = List(elements, tail_var)
                 new_subst = unify(lst, result_list, subst)
                 if new_subst is not None:
@@ -351,18 +347,20 @@ class ListOperationsBuiltins:
     ) -> Iterator[Substitution]:
         index, lst, elem = args
         index = deref(index, subst)
-
+        # Backward-compatible behavior: support both bound and free index
+        # Use a single pre-created zero-based index var for generation/backtracking
+        zero_index_var = engine._fresh_variable("idx0_")
         if isinstance(index, Number) and isinstance(index.value, int):
             if index.value < 1:
                 raise PrologThrow(PrologError.domain_error("not_less_than_one", index))
             # Convert to 0-based
             zero_index = Number(index.value - 1)
-            yield from ListOperationsBuiltins._builtin_nth0(
+            for subst_result in ListOperationsBuiltins._builtin_nth0(
                 (zero_index, lst, elem), subst, engine
-            )
+            ):
+                yield subst_result
         else:
-            # For backtracking mode, use a single pre-created zero-based index var
-            zero_index_var = engine._fresh_variable("idx0_")
+            # Backtracking path: derive from nth0 with a shared zero-based index var
             for subst_result in ListOperationsBuiltins._builtin_nth0(
                 (zero_index_var, lst, elem), subst, engine
             ):
@@ -381,13 +379,12 @@ class ListOperationsBuiltins:
         lst = deref(lst, subst)
         elem = deref(elem, subst)
 
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("last/2"))
         if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
+            raise PrologThrow(PrologError.type_error("list", lst, "last/2"))
 
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
+        py_list = list_to_python(lst, subst)
 
         if not py_list:
             return  # Empty list, fail
@@ -403,14 +400,12 @@ class ListOperationsBuiltins:
     ) -> Iterator[Substitution]:
         elem, lst, remainder = args
         lst = deref(lst, subst)
-
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("select/3"))
         if not isinstance(lst, List):
             raise PrologThrow(PrologError.type_error("list", lst))
 
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
+        py_list = list_to_python(lst, subst)
 
         # Find all positions where elem matches
         for i, item in enumerate(py_list):
@@ -430,13 +425,12 @@ class ListOperationsBuiltins:
         elem, lst = args
         lst = deref(lst, subst)
 
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("memberchk/2"))
         if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
+            raise PrologThrow(PrologError.type_error("list", lst, "memberchk/2"))
 
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
+        py_list = list_to_python(lst, subst)
 
         # Check for first match only (deterministic)
         for item in py_list:
@@ -479,13 +473,12 @@ class ListOperationsBuiltins:
         lst, sum_result = args
         lst = deref(lst, subst)
 
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("sumlist/2"))
         if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
+            raise PrologThrow(PrologError.type_error("list", lst, "sumlist/2"))
 
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
+        py_list = list_to_python(lst, subst)
 
         total = 0
         for item in py_list:
@@ -504,13 +497,12 @@ class ListOperationsBuiltins:
         lst, max_result = args
         lst = deref(lst, subst)
 
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("max_list/2"))
         if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
+            raise PrologThrow(PrologError.type_error("list", lst, "max_list/2"))
 
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
+        py_list = list_to_python(lst, subst)
 
         if not py_list:
             raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
@@ -534,13 +526,12 @@ class ListOperationsBuiltins:
         lst, min_result = args
         lst = deref(lst, subst)
 
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("min_list/2"))
         if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
+            raise PrologThrow(PrologError.type_error("list", lst, "min_list/2"))
 
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
+        py_list = list_to_python(lst, subst)
 
         if not py_list:
             raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
