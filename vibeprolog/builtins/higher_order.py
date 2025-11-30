@@ -71,157 +71,70 @@ class HigherOrderBuiltins:
         yield from apply_goal(0, subst)
 
     @staticmethod
-    def _builtin_maplist_3(
-        args: BuiltinArgs, subst: Substitution, engine: EngineContext
-    ) -> Iterator[Substitution]:
-        """maplist/3 - Apply binary predicate to corresponding elements of two lists."""
-        pred, list1, list2 = args
+    def _maplist_n(args: BuiltinArgs, subst: Substitution, engine: EngineContext, arity: int) -> Iterator[Substitution]:
+        """Generic helper for maplist/3-5 predicates."""
+        pred, *lists = args
+        context = f"maplist/{arity}"
         pred = deref(pred, subst)
-        list1 = deref(list1, subst)
-        list2 = deref(list2, subst)
 
-        # Type checking
-        if not isinstance(list1, List):
-            raise PrologThrow(PrologError.type_error("list", list1, "maplist/3"))
-        if not isinstance(list2, List):
-            raise PrologThrow(PrologError.type_error("list", list2, "maplist/3"))
+        # Validate and convert lists
+        py_lists = []
+        for l in lists:
+            l_deref = deref(l, subst)
+            if not isinstance(l_deref, List):
+                raise PrologThrow(PrologError.type_error("list", l_deref, context))
+            try:
+                py_lists.append(list_to_python(l_deref, subst))
+            except TypeError:
+                return
 
-        try:
-            py_list1 = list_to_python(list1, subst)
-            py_list2 = list_to_python(list2, subst)
-        except TypeError:
+        if not py_lists:
             return
 
-        if len(py_list1) != len(py_list2):
-            return  # Lists must be same length
+        first_len = len(py_lists[0])
+        if not all(len(pl) == first_len for pl in py_lists[1:]):
+            return
 
         def apply_pred(index: int, current_subst: Substitution) -> Iterator[Substitution]:
-            if index >= len(py_list1):
+            if index >= first_len:
                 yield current_subst
                 return
 
-            elem1 = py_list1[index]
-            elem2 = py_list2[index]
-
-            # Create goal: pred(elem1, elem2)
+            elems = tuple(pl[index] for pl in py_lists)
+            
+            # Create goal
             if isinstance(pred, Atom):
-                goal = Compound(pred.name, (elem1, elem2))
+                goal = Compound(pred.name, elems)
             elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + (elem1, elem2))
+                goal = Compound(pred.functor, pred.args + elems)
             else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "maplist/3"))
+                raise PrologThrow(PrologError.type_error("callable", pred, context))
 
             for solution in engine._solve_goals([goal], current_subst):
                 yield from apply_pred(index + 1, solution)
 
         yield from apply_pred(0, subst)
+
+    @staticmethod
+    def _builtin_maplist_3(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """maplist/3 - Apply binary predicate to corresponding elements of two lists."""
+        yield from HigherOrderBuiltins._maplist_n(args, subst, engine, 3)
 
     @staticmethod
     def _builtin_maplist_4(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         """maplist/4 - Apply ternary predicate to corresponding elements of three lists."""
-        pred, list1, list2, list3 = args
-        pred = deref(pred, subst)
-        list1 = deref(list1, subst)
-        list2 = deref(list2, subst)
-        list3 = deref(list3, subst)
-
-        # Type checking
-        if not isinstance(list1, List):
-            raise PrologThrow(PrologError.type_error("list", list1, "maplist/4"))
-        if not isinstance(list2, List):
-            raise PrologThrow(PrologError.type_error("list", list2, "maplist/4"))
-        if not isinstance(list3, List):
-            raise PrologThrow(PrologError.type_error("list", list3, "maplist/4"))
-
-        try:
-            py_list1 = list_to_python(list1, subst)
-            py_list2 = list_to_python(list2, subst)
-            py_list3 = list_to_python(list3, subst)
-        except TypeError:
-            return
-
-        if len(py_list1) != len(py_list2) or len(py_list2) != len(py_list3):
-            return  # All lists must be same length
-
-        def apply_pred(index: int, current_subst: Substitution) -> Iterator[Substitution]:
-            if index >= len(py_list1):
-                yield current_subst
-                return
-
-            elem1 = py_list1[index]
-            elem2 = py_list2[index]
-            elem3 = py_list3[index]
-
-            # Create goal: pred(elem1, elem2, elem3)
-            if isinstance(pred, Atom):
-                goal = Compound(pred.name, (elem1, elem2, elem3))
-            elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + (elem1, elem2, elem3))
-            else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "maplist/4"))
-
-            for solution in engine._solve_goals([goal], current_subst):
-                yield from apply_pred(index + 1, solution)
-
-        yield from apply_pred(0, subst)
+        yield from HigherOrderBuiltins._maplist_n(args, subst, engine, 4)
 
     @staticmethod
     def _builtin_maplist_5(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         """maplist/5 - Apply 4-ary predicate to corresponding elements of four lists."""
-        pred, list1, list2, list3, list4 = args
-        pred = deref(pred, subst)
-        list1 = deref(list1, subst)
-        list2 = deref(list2, subst)
-        list3 = deref(list3, subst)
-        list4 = deref(list4, subst)
-
-        # Type checking
-        if not isinstance(list1, List):
-            raise PrologThrow(PrologError.type_error("list", list1, "maplist/5"))
-        if not isinstance(list2, List):
-            raise PrologThrow(PrologError.type_error("list", list2, "maplist/5"))
-        if not isinstance(list3, List):
-            raise PrologThrow(PrologError.type_error("list", list3, "maplist/5"))
-        if not isinstance(list4, List):
-            raise PrologThrow(PrologError.type_error("list", list4, "maplist/5"))
-
-        try:
-            py_list1 = list_to_python(list1, subst)
-            py_list2 = list_to_python(list2, subst)
-            py_list3 = list_to_python(list3, subst)
-            py_list4 = list_to_python(list4, subst)
-        except TypeError:
-            return
-
-        if len(py_list1) != len(py_list2) or len(py_list2) != len(py_list3) or len(py_list3) != len(py_list4):
-            return  # All lists must be same length
-
-        def apply_pred(index: int, current_subst: Substitution) -> Iterator[Substitution]:
-            if index >= len(py_list1):
-                yield current_subst
-                return
-
-            elem1 = py_list1[index]
-            elem2 = py_list2[index]
-            elem3 = py_list3[index]
-            elem4 = py_list4[index]
-
-            # Create goal: pred(elem1, elem2, elem3, elem4)
-            if isinstance(pred, Atom):
-                goal = Compound(pred.name, (elem1, elem2, elem3, elem4))
-            elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + (elem1, elem2, elem3, elem4))
-            else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "maplist/5"))
-
-            for solution in engine._solve_goals([goal], current_subst):
-                yield from apply_pred(index + 1, solution)
-
-        yield from apply_pred(0, subst)
+        yield from HigherOrderBuiltins._maplist_n(args, subst, engine, 5)
 
     @staticmethod
     def _builtin_include(
@@ -233,32 +146,7 @@ class HigherOrderBuiltins:
         list_in = deref(list_in, subst)
         list_out = deref(list_out, subst)
 
-        if not isinstance(list_in, List):
-            raise PrologThrow(PrologError.type_error("list", list_in, "include/3"))
-
-        try:
-            py_list_in = list_to_python(list_in, subst)
-        except TypeError:
-            return
-
-        filtered = []
-        for elem in py_list_in:
-            # Test if pred(elem) succeeds
-            if isinstance(pred, Atom):
-                goal = Compound(pred.name, (elem,))
-            elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + (elem,))
-            else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "include/3"))
-
-            # If predicate succeeds for this element, include it
-            if any(engine._solve_goals([goal], subst)):
-                filtered.append(elem)
-
-        result_list = python_to_list(filtered)
-        new_subst = unify(list_out, result_list, subst)
-        if new_subst is not None:
-            yield new_subst
+        yield from HigherOrderBuiltins._filter_list(args, subst, engine, include=True)
 
     @staticmethod
     def _builtin_exclude(
@@ -270,8 +158,21 @@ class HigherOrderBuiltins:
         list_in = deref(list_in, subst)
         list_out = deref(list_out, subst)
 
+        yield from HigherOrderBuiltins._filter_list(args, subst, engine, include=False)
+
+    @staticmethod
+    def _filter_list(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext, *, include: bool
+    ) -> Iterator[Substitution]:
+        """Helper for include/3 and exclude/3."""
+        pred, list_in, list_out = args
+        context = "include/3" if include else "exclude/3"
+        pred = deref(pred, subst)
+        list_in = deref(list_in, subst)
+        list_out = deref(list_out, subst)
+
         if not isinstance(list_in, List):
-            raise PrologThrow(PrologError.type_error("list", list_in, "exclude/3"))
+            raise PrologThrow(PrologError.type_error("list", list_in, context))
 
         try:
             py_list_in = list_to_python(list_in, subst)
@@ -280,16 +181,15 @@ class HigherOrderBuiltins:
 
         filtered = []
         for elem in py_list_in:
-            # Test if pred(elem) succeeds
             if isinstance(pred, Atom):
                 goal = Compound(pred.name, (elem,))
             elif isinstance(pred, Compound):
                 goal = Compound(pred.functor, pred.args + (elem,))
             else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "exclude/3"))
+                raise PrologThrow(PrologError.type_error("callable", pred, context))
 
-            # If predicate fails for this element, include it
-            if not any(engine._solve_goals([goal], subst)):
+            succeeds = any(engine._solve_goals([goal], subst))
+            if succeeds if include else not succeeds:
                 filtered.append(elem)
 
         result_list = python_to_list(filtered)
@@ -344,148 +244,74 @@ class HigherOrderBuiltins:
                 yield new_subst
 
     @staticmethod
-    def _builtin_foldl_4(
-        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    def _builtin_foldl_n(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext, arity: int
     ) -> Iterator[Substitution]:
-        """foldl/4 - Fold list from left with accumulator (single list)."""
-        pred, list_in, acc0, acc = args
+        """Generic foldl/N implementation."""
+        pred, *lists, acc0, acc = args
+        context = f"foldl/{arity}"
+
         pred = deref(pred, subst)
-        list_in = deref(list_in, subst)
         acc0 = deref(acc0, subst)
         acc = deref(acc, subst)
 
-        if not isinstance(list_in, List):
-            raise PrologThrow(PrologError.type_error("list", list_in, "foldl/4"))
+        # Validate and convert lists
+        py_lists = []
+        for l in lists:
+            l_deref = deref(l, subst)
+            if not isinstance(l_deref, List):
+                raise PrologThrow(PrologError.type_error("list", l_deref, context))
+            try:
+                py_lists.append(list_to_python(l_deref, subst))
+            except TypeError:
+                return
 
-        try:
-            py_list_in = list_to_python(list_in, subst)
-        except TypeError:
+        # Check lengths
+        if py_lists and not all(len(pl) == len(py_lists[0]) for pl in py_lists[1:]):
             return
 
+        first_len = len(py_lists[0]) if py_lists else 0
         current_acc = acc0
-        for elem in py_list_in:
-            # Call pred(elem, current_acc, new_acc)
-            if isinstance(pred, Atom):
-                goal = Compound(pred.name, (elem, current_acc, acc))
-            elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + (elem, current_acc, acc))
-            else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "foldl/4"))
 
-            # Find solutions for the accumulator
+        for idx in range(first_len):
+            goal_args = tuple(pl[idx] for pl in py_lists) + (current_acc, acc)
+            if isinstance(pred, Atom):
+                goal = Compound(pred.name, goal_args)
+            elif isinstance(pred, Compound):
+                goal = Compound(pred.functor, pred.args + goal_args)
+            else:
+                raise PrologThrow(PrologError.type_error("callable", pred, context))
+
             solutions = list(engine._solve_goals([goal], subst))
             if not solutions:
                 return  # No solution, fail
 
-            # Use the first solution and update accumulator
             current_acc = deref(acc, solutions[0])
 
-        # Final accumulator should unify with acc
         new_subst = unify(acc, current_acc, subst)
         if new_subst is not None:
             yield new_subst
+
+    @staticmethod
+    def _builtin_foldl_4(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """foldl/4 - Fold list from left with accumulator (single list)."""
+        yield from HigherOrderBuiltins._builtin_foldl_n(args, subst, engine, 4)
 
     @staticmethod
     def _builtin_foldl_5(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         """foldl/5 - Fold two lists from left with accumulator."""
-        pred, list1, list2, acc0, acc = args
-        pred = deref(pred, subst)
-        list1 = deref(list1, subst)
-        list2 = deref(list2, subst)
-        acc0 = deref(acc0, subst)
-        acc = deref(acc, subst)
-
-        if not isinstance(list1, List):
-            raise PrologThrow(PrologError.type_error("list", list1, "foldl/5"))
-        if not isinstance(list2, List):
-            raise PrologThrow(PrologError.type_error("list", list2, "foldl/5"))
-
-        try:
-            py_list1 = list_to_python(list1, subst)
-            py_list2 = list_to_python(list2, subst)
-        except TypeError:
-            return
-
-        if len(py_list1) != len(py_list2):
-            return  # Lists must be same length
-
-        current_acc = acc0
-        for elem1, elem2 in zip(py_list1, py_list2):
-            # Call pred(elem1, elem2, current_acc, new_acc)
-            if isinstance(pred, Atom):
-                goal = Compound(pred.name, (elem1, elem2, current_acc, acc))
-            elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + (elem1, elem2, current_acc, acc))
-            else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "foldl/5"))
-
-            # Find solutions for the accumulator
-            solutions = list(engine._solve_goals([goal], subst))
-            if not solutions:
-                return  # No solution, fail
-
-            # Use the first solution and update accumulator
-            current_acc = deref(acc, solutions[0])
-
-        # Final accumulator should unify with acc
-        new_subst = unify(acc, current_acc, subst)
-        if new_subst is not None:
-            yield new_subst
+        yield from HigherOrderBuiltins._builtin_foldl_n(args, subst, engine, 5)
 
     @staticmethod
     def _builtin_foldl_6(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         """foldl/6 - Fold three lists from left with accumulator."""
-        pred, list1, list2, list3, acc0, acc = args
-        pred = deref(pred, subst)
-        list1 = deref(list1, subst)
-        list2 = deref(list2, subst)
-        list3 = deref(list3, subst)
-        acc0 = deref(acc0, subst)
-        acc = deref(acc, subst)
-
-        if not isinstance(list1, List):
-            raise PrologThrow(PrologError.type_error("list", list1, "foldl/6"))
-        if not isinstance(list2, List):
-            raise PrologThrow(PrologError.type_error("list", list2, "foldl/6"))
-        if not isinstance(list3, List):
-            raise PrologThrow(PrologError.type_error("list", list3, "foldl/6"))
-
-        try:
-            py_list1 = list_to_python(list1, subst)
-            py_list2 = list_to_python(list2, subst)
-            py_list3 = list_to_python(list3, subst)
-        except TypeError:
-            return
-
-        if len(py_list1) != len(py_list2) or len(py_list2) != len(py_list3):
-            return  # All lists must be same length
-
-        current_acc = acc0
-        for elem1, elem2, elem3 in zip(py_list1, py_list2, py_list3):
-            # Call pred(elem1, elem2, elem3, current_acc, new_acc)
-            if isinstance(pred, Atom):
-                goal = Compound(pred.name, (elem1, elem2, elem3, current_acc, acc))
-            elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + (elem1, elem2, elem3, current_acc, acc))
-            else:
-                raise PrologThrow(PrologError.type_error("callable", pred, "foldl/6"))
-
-            # Find solutions for the accumulator
-            solutions = list(engine._solve_goals([goal], subst))
-            if not solutions:
-                return  # No solution, fail
-
-            # Use the first solution and update accumulator
-            current_acc = deref(acc, solutions[0])
-
-        # Final accumulator should unify with acc
-        new_subst = unify(acc, current_acc, subst)
-        if new_subst is not None:
-            yield new_subst
+        yield from HigherOrderBuiltins._builtin_foldl_n(args, subst, engine, 6)
 
 
 __all__ = ["HigherOrderBuiltins"]
