@@ -283,62 +283,76 @@ class ListOperationsBuiltins:
         lst = deref(lst, subst)
         elem = deref(elem, subst)
 
-        # Do not require lst to be a concrete list here to allow generation (nth0/3)
-        try:
-            py_list = list_to_python(lst, subst)
-        except TypeError:
-            # If lst is not a proper list yet, defer error to modes that demand a list
-            py_list = None
-
-        # Mode 1: Index is bound, get element
-        if isinstance(index, Number) and isinstance(index.value, int):
-            idx = index.value
-            if idx < 0:
+        # Validate index if bound
+        if isinstance(index, Number):
+            if not isinstance(index.value, int):
+                raise PrologThrow(PrologError.type_error("integer", index))
+            if index.value < 0:
                 raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
-            if py_list is not None and idx < len(py_list):
+        elif not isinstance(index, Variable):
+            raise PrologThrow(PrologError.type_error("integer", index))
+
+        # Try to convert list to Python list if bound
+        py_list = None
+        if isinstance(lst, List):
+            try:
+                py_list = list_to_python(lst, subst)
+            except TypeError:
+                pass
+
+        # Determine which mode(s) to execute based on what's bound
+        index_bound = isinstance(index, Number)
+        list_bound = py_list is not None
+        elem_bound = not isinstance(elem, Variable)
+
+        # Mode 1: nth0(+Index, +List, ?Elem) - get/check element at index
+        if index_bound and list_bound:
+            idx = index.value
+            if idx < len(py_list):
                 new_subst = unify(elem, py_list[idx], subst)
                 if new_subst is not None:
                     yield new_subst
-            # Out of range: fail (no match)
-        elif isinstance(index, Number) and not isinstance(index.value, int):
-            # Index is a number but not an integer
-            raise PrologThrow(PrologError.type_error("integer", index))
-        elif not isinstance(index, Variable):
-            # Index is bound but not a number
-            raise PrologThrow(PrologError.type_error("integer", index))
+            return
 
-        # Mode 2: Element is bound, find index (backtracking)
-        elif not isinstance(elem, Variable):
-            if py_list is None:
-                raise PrologThrow(PrologError.type_error("list", lst))
+        # Mode 2: nth0(?Index, +List, +Elem) - find indices of element
+        if list_bound and elem_bound:
             for i, item in enumerate(py_list):
                 if terms_equal(elem, item):
                     new_subst = unify(index, Number(i), subst)
                     if new_subst is not None:
                         yield new_subst
+            return
 
-        # Mode 3: Generate list with element at index
-        elif isinstance(index, Number) and isinstance(index.value, int):
+        # Mode 3: nth0(+Index, -List, ?Elem) - generate list with elem at index
+        if index_bound and not list_bound:
             idx = index.value
-            if idx < 0:
-                raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
-            if py_list is None:
-                # If we don't have a concrete list yet, this mode cannot be generated
-                return
             if idx == 0:
                 tail_var = engine._fresh_variable("Tail_")
                 result_list = List((elem,), tail_var)
-                new_subst = unify(lst, result_list, subst)
-                if new_subst is not None:
-                    yield new_subst
             else:
                 prefix = [engine._fresh_variable(f"Elem{i}_") for i in range(idx)]
                 tail_var = engine._fresh_variable("Tail_")
                 elements = tuple(prefix) + (elem,)
                 result_list = List(elements, tail_var)
-                new_subst = unify(lst, result_list, subst)
+
+            new_subst = unify(lst, result_list, subst)
+            if new_subst is not None:
+                yield new_subst
+            return
+
+        # Mode 4: nth0(?Index, +List, ?Elem) - enumerate all index-element pairs
+        if list_bound and not index_bound and not elem_bound:
+            for i, item in enumerate(py_list):
+                new_subst = unify(index, Number(i), subst)
                 if new_subst is not None:
-                    yield new_subst
+                    new_subst = unify(elem, item, new_subst)
+                    if new_subst is not None:
+                        yield new_subst
+            return
+
+        # Other combinations not supported - fail
+        if isinstance(lst, Variable) and isinstance(index, Variable):
+            raise PrologThrow(PrologError.instantiation_error("nth0/3"))
 
     @staticmethod
     def _builtin_nth1(
@@ -377,45 +391,88 @@ class ListOperationsBuiltins:
         lst, elem = args
         lst = deref(lst, subst)
         elem = deref(elem, subst)
-        # InstantiationError if input is unbound
-        if isinstance(lst, Variable):
-            raise PrologThrow(PrologError.instantiation_error("last/2"))
-        if not isinstance(lst, List):
+
+        # Mode: last(+List, ?Elem) - get last element of a bound list
+        if isinstance(lst, List):
+            py_list = list_to_python(lst, subst)
+            if not py_list:
+                return  # Empty list, fail
+
+            last_elem = py_list[-1]
+            new_subst = unify(elem, last_elem, subst)
+            if new_subst is not None:
+                yield new_subst
+
+        # Mode: last(-List, +Elem) - generate lists ending with Elem
+        # Generates: [Elem], [_, Elem], [_, _, Elem], etc.
+        # Note: This generates infinite solutions through backtracking
+        elif isinstance(lst, Variable):
+            # Generate lists of increasing length ending with elem
+            length = 1
+            while True:
+                if length == 1:
+                    result_list = List((elem,), None)
+                else:
+                    # Create a list with (length-1) fresh variables followed by elem
+                    prefix = [engine._fresh_variable(f"Prefix{i}_") for i in range(length - 1)]
+                    result_list = python_to_list(prefix + [elem])
+
+                new_subst = unify(lst, result_list, subst)
+                if new_subst is not None:
+                    yield new_subst
+                length += 1
+
+        # lst is bound but not a List
+        else:
             raise PrologThrow(PrologError.type_error("list", lst, "last/2"))
-
-        py_list = list_to_python(lst, subst)
-        if not py_list:
-            return  # Empty list, fail
-
-        last_elem = py_list[-1]
-        new_subst = unify(elem, last_elem, subst)
-        if new_subst is not None:
-            yield new_subst
 
     @staticmethod
     def _builtin_select(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         elem, lst, remainder = args
+        elem = deref(elem, subst)
         lst = deref(lst, subst)
-        # InstantiationError if list is unbound
-        if isinstance(lst, Variable):
-            raise PrologThrow(PrologError.instantiation_error("select/3"))
-        if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst, "select/3"))
+        remainder = deref(remainder, subst)
 
-        py_list = list_to_python(lst, subst)
+        # Mode: select(?Elem, +List, ?Remainder) - remove elem from list
+        if isinstance(lst, List):
+            py_list = list_to_python(lst, subst)
 
-        # Find all positions where elem matches
-        for i, item in enumerate(py_list):
-            new_subst = unify(elem, item, subst)
-            if new_subst is not None:
-                # Create remainder by removing element at i
-                remainder_py = py_list[:i] + py_list[i+1:]
-                remainder_list = python_to_list(remainder_py)
-                final_subst = unify(remainder, remainder_list, new_subst)
+            # Find all positions where elem matches
+            for i, item in enumerate(py_list):
+                new_subst = unify(elem, item, subst)
+                if new_subst is not None:
+                    # Create remainder by removing element at i
+                    remainder_py = py_list[:i] + py_list[i+1:]
+                    remainder_list = python_to_list(remainder_py)
+                    final_subst = unify(remainder, remainder_list, new_subst)
+                    if final_subst is not None:
+                        yield final_subst
+
+        # Mode: select(?Elem, -List, +Remainder) - insert elem into remainder
+        # Generates List by inserting Elem at each position in Remainder
+        elif isinstance(lst, Variable) and isinstance(remainder, List):
+            py_remainder = list_to_python(remainder, subst)
+
+            # Insert elem at each possible position (0 to len(py_remainder))
+            for i in range(len(py_remainder) + 1):
+                # Create list with elem inserted at position i
+                list_py = py_remainder[:i] + [elem] + py_remainder[i:]
+                list_prolog = python_to_list(list_py)
+                final_subst = unify(lst, list_prolog, subst)
                 if final_subst is not None:
                     yield final_subst
+
+        # Both lst and remainder are unbound - cannot proceed
+        elif isinstance(lst, Variable) and isinstance(remainder, Variable):
+            raise PrologThrow(PrologError.instantiation_error("select/3"))
+
+        # Type errors
+        elif not isinstance(lst, Variable) and not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst, "select/3"))
+        elif not isinstance(remainder, Variable) and not isinstance(remainder, List):
+            raise PrologThrow(PrologError.type_error("list", remainder, "select/3"))
 
     @staticmethod
     def _builtin_memberchk(

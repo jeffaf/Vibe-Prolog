@@ -129,6 +129,38 @@ class TestNth0:
         with pytest.raises(Exception):  # Should raise type_error
             prolog.query_once("nth0(atom, [a,b,c], X).")
 
+    def test_nth0_generate_list(self, prolog):
+        """Test nth0/3 generating lists with element at specific index (relational mode)."""
+        # Generate a list with 'x' at index 0
+        result = prolog.query_once("nth0(0, L, x).")
+        assert result is not None
+        assert result['L'][0] == 'x'
+        assert len(result['L']) >= 1
+
+        # Generate a list with 'y' at index 2
+        result = prolog.query_once("nth0(2, L, y).")
+        assert result is not None
+        assert len(result['L']) >= 3
+        assert result['L'][2] == 'y'
+
+    def test_nth0_backtrack_indices(self, prolog):
+        """Test nth0/3 finding all indices of an element through backtracking."""
+        # Find all positions where 'a' appears in [a,b,a,c]
+        results = prolog.query("nth0(I, [a,b,a,c], a).")
+        indices = sorted([r['I'] for r in results])
+        assert indices == [0, 2]
+
+    def test_nth0_backtrack_elements(self, prolog):
+        """Test nth0/3 enumerating all elements with their indices."""
+        results = prolog.query("nth0(I, [a,b,c], E).")
+        assert len(results) == 3
+
+        # Check we get all index-element pairs
+        pairs = [(r['I'], r['E']) for r in results]
+        assert (0, 'a') in pairs
+        assert (1, 'b') in pairs
+        assert (2, 'c') in pairs
+
 
 class TestNth1:
     """Tests for nth1/3 predicate."""
@@ -151,6 +183,38 @@ class TestNth1:
         """Test nth1 with negative index."""
         with pytest.raises(Exception):  # Should raise domain_error
             prolog.query_once("nth1(-1, [a,b,c], X).")
+
+    def test_nth1_generate_list(self, prolog):
+        """Test nth1/3 generating lists with element at specific index (relational mode)."""
+        # Generate a list with 'x' at index 1 (first position)
+        result = prolog.query_once("nth1(1, L, x).")
+        assert result is not None
+        assert result['L'][0] == 'x'  # 1-based index 1 = 0-based index 0
+        assert len(result['L']) >= 1
+
+        # Generate a list with 'y' at index 3 (third position)
+        result = prolog.query_once("nth1(3, L, y).")
+        assert result is not None
+        assert len(result['L']) >= 3
+        assert result['L'][2] == 'y'  # 1-based index 3 = 0-based index 2
+
+    def test_nth1_backtrack_indices(self, prolog):
+        """Test nth1/3 finding all 1-based indices of an element through backtracking."""
+        # Find all 1-based positions where 'a' appears in [a,b,a,c]
+        results = prolog.query("nth1(I, [a,b,a,c], a).")
+        indices = sorted([r['I'] for r in results])
+        assert indices == [1, 3]  # 1-based indices
+
+    def test_nth1_backtrack_elements(self, prolog):
+        """Test nth1/3 enumerating all elements with their 1-based indices."""
+        results = prolog.query("nth1(I, [a,b,c], E).")
+        assert len(results) == 3
+
+        # Check we get all index-element pairs (1-based)
+        pairs = [(r['I'], r['E']) for r in results]
+        assert (1, 'a') in pairs
+        assert (2, 'b') in pairs
+        assert (3, 'c') in pairs
 
 
 class TestLast:
@@ -181,6 +245,25 @@ class TestLast:
         """Test last with non-list."""
         with pytest.raises(Exception):  # Should raise type_error
             prolog.query_once("last(atom, X).")
+
+    def test_last_generate_lists(self, prolog):
+        """Test last/2 generating lists ending with a given element (relational mode)."""
+        # Generate first 3 lists ending with 'z' using limit parameter
+        results = prolog.query("last(L, z).", limit=3)
+
+        # Check we got 3 solutions
+        assert len(results) == 3
+
+        # First solution should be [z]
+        assert results[0]['L'] == ['z']
+
+        # Second solution should be [_, z] (one variable + z)
+        assert len(results[1]['L']) == 2
+        assert results[1]['L'][1] == 'z'
+
+        # Third solution should be [_, _, z] (two variables + z)
+        assert len(results[2]['L']) == 3
+        assert results[2]['L'][2] == 'z'
 
 
 class TestSelect:
@@ -217,6 +300,43 @@ class TestSelect:
         """Test select with non-list."""
         with pytest.raises(Exception):  # Should raise type_error
             prolog.query_once("select(a, atom, X).")
+
+    def test_select_insert_mode(self, prolog):
+        """Test select/3 in insert mode (relational): select(?Elem, -List, +Remainder)."""
+        # Insert 'x' at all positions in [a,b]
+        results = prolog.query("select(x, L, [a,b]).")
+        assert len(results) == 3  # Three positions: beginning, middle, end
+
+        lists = sorted([r['L'] for r in results])
+        # Should generate: [x,a,b], [a,x,b], [a,b,x]
+        assert ['a', 'b', 'x'] in lists
+        assert ['a', 'x', 'b'] in lists
+        assert ['x', 'a', 'b'] in lists
+
+    def test_select_insert_empty_list(self, prolog):
+        """Test select/3 inserting into empty list."""
+        result = prolog.query_once("select(x, L, []).")
+        assert result is not None
+        assert result['L'] == ['x']
+
+    def test_select_bidirectional(self, prolog):
+        """Test select/3 works bidirectionally."""
+        # Forward: remove from list
+        result1 = prolog.query_once("select(b, [a,b,c], R).")
+        assert result1 is not None
+        assert result1['R'] == ['a', 'c']
+
+        # Backward: insert into remainder
+        result2 = prolog.query_once("select(b, L, [a,c]).")
+        assert result2 is not None
+        # One of the valid insertions
+        assert 'b' in result2['L']
+        assert len(result2['L']) == 3
+
+    def test_select_instantiation_error(self, prolog):
+        """Test select/3 with both list and remainder unbound."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("select(x, L, R).")
 
 
 class TestMemberchk:
