@@ -1269,11 +1269,7 @@ class IOBuiltins:
         code_term = deref(code_term, subst)
 
         # Validate that it's an integer
-        if not isinstance(code_term, Number):
-            error_term = PrologError.type_error("integer", code_term, "put_code/2")
-            raise PrologThrow(error_term)
-
-        if not isinstance(code_term.value, int):
+        if not isinstance(code_term, Number) or not isinstance(code_term.value, int):
             error_term = PrologError.type_error("integer", code_term, "put_code/2")
             raise PrologThrow(error_term)
 
