@@ -108,8 +108,8 @@ PROLOG_GRAMMAR = r"""
     op_symbol_or_atom: OP_SYMBOL | ATOM | SPECIAL_ATOM | OPERATOR_ATOM
     
     // Operator symbols - must match complete sequences before breaking into component operators
-    // Higher priority than other operators
-    OP_SYMBOL.15: /[+\-*\/<>=\\@#$&|!~:?^.]+/
+    // Priority set to ensure special atoms like -$ are recognized, but still below SPECIAL_ATOM_OPS
+    OP_SYMBOL: /[+\-*\/<>=\\@#$&!~:?^.]+/
 
     predicate_indicators: comparison_term ("," comparison_term)*
 
@@ -143,9 +143,11 @@ PROLOG_GRAMMAR = r"""
 
     unary_expr: PREFIX_OP unary_expr  -> prefix_op
         | "-" unary_expr  -> prefix_op
+        | "+" unary_expr  -> prefix_op
         | primary
 
-    primary: operator_atom
+    primary: SPECIAL_ATOM_OPS -> special_atom_token
+        | operator_atom
         | compound
         | curly_braces
         | string
@@ -166,8 +168,8 @@ PROLOG_GRAMMAR = r"""
 
     COMP_OP: "=.." | "is" | "=" | "\\=" | "=:=" | "=\=" | "<" | ">" | "=<" | ">=" | "==" | "\\==" | "@<" | "@=<" | "@>" | "@>="
     OPERATOR_ATOM: ":-" | "-->"
-    PREFIX_OP.3: "\\+" | "+" | "-"
-    ADD_OP: "+" | "-"
+    PREFIX_OP.3: "\\+" | /\+(?!\$)/ | /\-(?!\$)/
+    ADD_OP: /\+(?!\$)/ | /\-(?!\$)/
     POW_OP.2: "**"
     MUL_OP: "*" | "/" | "//" | "mod"
 
@@ -189,6 +191,12 @@ PROLOG_GRAMMAR = r"""
     // Allow broader alphanumerics after \\x so lexer does not reject malformed hex sequences that should become syntax errors
     CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'\\])/ | /\d+'.'/
 
+    STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
+    SPECIAL_ATOM: /'([^'\\]|\\.)+'/
+    
+    // Special atom operators must have HIGHEST priority to prevent being parsed as prefix operators
+    SPECIAL_ATOM_OPS.12: /-\$/ | /\$-/
+
     // Scientific notation, hex, octal, binary, base'digits
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
             | /-?0o[0-7]+/i
@@ -199,9 +207,6 @@ PROLOG_GRAMMAR = r"""
             | /-?\d+'[a-zA-Z0-9_]+/
             | /-?\d+/
 
-    STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
-    SPECIAL_ATOM: /'([^'\\]|\\.)+'/
-    SPECIAL_ATOM_OPS.5: /-\$/
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
 
     VARIABLE: /[A-Z_][a-zA-Z0-9_]*/
@@ -457,6 +462,11 @@ class PrologTransformer(Transformer):
 
     def primary(self, items):
        return items[0]
+    
+    def special_atom_token(self, items):
+       """Convert SPECIAL_ATOM_OPS token to an Atom."""
+       token_str = str(items[0])
+       return Atom(token_str)
 
     def compound(self, items):
         functor = items[0]
