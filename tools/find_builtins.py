@@ -9,17 +9,14 @@ but not defined, likely indicating they're built-in predicates.
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 from collections import defaultdict
-from typing import Set, Dict
+from pathlib import Path
+from typing import Dict, Set
 
-# Add parent directory to path to import vibeprolog
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-# Import after path modification (ruff: disable E402)
-from vibeprolog.parser import PrologParser  # noqa: E402
-from vibeprolog.terms import Compound, Atom  # noqa: E402
-from vibeprolog.interpreter import PrologInterpreter  # noqa: E402
+# Use package-installed imports; do not modify sys.path
+from vibeprolog.parser import PrologParser, Clause, Directive, PredicatePropertyDirective  # noqa: E402
+from vibeprolog.terms import Compound, Atom, Number  # noqa: E402
+from vibeprolog.engine import PrologEngine  # noqa: E402
 
 
 def extract_calls(term, calls: Set[tuple[str, int]]) -> None:
@@ -38,8 +35,6 @@ def extract_calls(term, calls: Set[tuple[str, int]]) -> None:
 
 def get_known_builtins() -> Set[tuple[str, int]]:
     """Get the set of built-in predicates registered in Vibe-Prolog."""
-    from vibeprolog.engine import PrologEngine  # noqa: E402
-
     # Create a minimal engine just to get the built-in registry
     engine = PrologEngine([])
     return set(engine._builtin_registry.keys())
@@ -69,50 +64,35 @@ def analyze_file(
         print(f"Warning: Could not parse {filepath}: {e}", file=sys.stderr)
         return set(), set(), set()
 
-    defined = set()
-    called = set()
-    dynamic = set()
+    defined: set[tuple[str, int]] = set()
+    called: set[tuple[str, int]] = set()
+    dynamic: set[tuple[str, int]] = set()
 
     for item in items:
-        # Check for dynamic declarations (parsed as PredicatePropertyDirective)
-        if hasattr(item, '__class__') and item.__class__.__name__ == 'Directive':
-            if hasattr(item, 'goal') and hasattr(item.goal, 'property'):
-                # PredicatePropertyDirective (e.g., :- dynamic foo/1, bar/2)
-                if item.goal.property == 'dynamic' and hasattr(item.goal, 'indicators'):
-                    indicators = item.goal.indicators
-                    # indicators is a tuple of Compound objects with functor '/'
-                    if isinstance(indicators, tuple):
-                        for indicator in indicators:
-                            if isinstance(indicator, Compound) and indicator.functor == '/':
-                                name_term, arity_term = indicator.args
-                                if isinstance(name_term, Atom):
-                                    arity = (
-                                        arity_term.value
-                                        if hasattr(arity_term, 'value')
-                                        else arity_term
-                                    )
-                                    dynamic.add((name_term.name, arity))
-
-        if hasattr(item, '__class__') and item.__class__.__name__ == 'Clause':
-            # Extract the head predicate
+        if isinstance(item, Clause):
+            # Head of the clause defines the predicate
             head = item.head
             if isinstance(head, Compound):
                 defined.add((head.functor, len(head.args)))
             elif isinstance(head, Atom):
                 defined.add((head.name, 0))
 
-            # Extract calls from the body
+            # Body goals are potential calls
             if item.body:
                 for goal in item.body:
                     extract_calls(goal, called)
-        elif hasattr(item, '__class__') and item.__class__.__name__ == 'Query':
-            # Queries also contain calls
-            for goal in item.goals:
-                extract_calls(goal, called)
-        elif hasattr(item, '__class__') and item.__class__.__name__ == 'Directive':
-            # Directives may contain calls
-            if hasattr(item, 'term'):
-                extract_calls(item.term, called)
+        elif isinstance(item, Directive):
+            # Dynamic directive: :- dynamic Foo/Arity, ...
+            if isinstance(item.goal, PredicatePropertyDirective) and item.goal.property == 'dynamic':
+                for indicator in item.goal.indicators:
+                    if isinstance(indicator, Compound) and indicator.functor == '/':
+                        name_term, arity_term = indicator.args
+                        if isinstance(name_term, Atom) and isinstance(arity_term, Number):
+                            dynamic.add((name_term.name, int(arity_term.value)))
+
+            # Also extract calls inside directives (e.g., queries like :- ?- goal.)
+            if hasattr(item, 'goal'):
+                extract_calls(item.goal, called)
 
     return defined, called, dynamic
 
