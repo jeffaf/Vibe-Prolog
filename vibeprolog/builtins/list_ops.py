@@ -12,6 +12,7 @@ from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List, Number, Variable
+from vibeprolog.terms import Atom, Compound
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import (
     compute_list_length,
@@ -248,10 +249,7 @@ class ListOperationsBuiltins:
         except TypeError:
             raise PrologThrow(PrologError.type_error("list", lst))
 
-        try:
-            sorted_py = sorted(py_list, key=term_sort_key)
-        except TypeError:
-            sorted_py = py_list
+        sorted_py = sorted(py_list, key=term_sort_key)
 
         result = python_to_list(sorted_py)
         return unify(sorted_lst, result, subst)
@@ -273,14 +271,11 @@ class ListOperationsBuiltins:
 
         # Check each element is a Key-Value pair
         for item in py_list:
-            if not (hasattr(item, 'functor') and item.functor == '-' and len(item.args) == 2):
+            if not (isinstance(item, Compound) and item.functor == '-' and len(item.args) == 2):
                 raise PrologThrow(PrologError.type_error("pair", item))
 
         # Sort by key (first argument of the pair)
-        try:
-            sorted_py = sorted(py_list, key=lambda pair: term_sort_key(pair.args[0]))
-        except TypeError:
-            sorted_py = py_list
+        sorted_py = sorted(py_list, key=lambda pair: term_sort_key(pair.args[0]))
 
         result = python_to_list(sorted_py)
         return unify(sorted_pairs, result, subst)
@@ -294,24 +289,23 @@ class ListOperationsBuiltins:
         lst = deref(lst, subst)
         elem = deref(elem, subst)
 
-        if not isinstance(lst, List):
-            raise PrologThrow(PrologError.type_error("list", lst))
-
+        # Do not require lst to be a concrete list here to allow generation (nth0/3)
         try:
             py_list = list_to_python(lst, subst)
         except TypeError:
-            raise PrologThrow(PrologError.type_error("list", lst))
+            # If lst is not a proper list yet, defer error to modes that demand a list
+            py_list = None
 
         # Mode 1: Index is bound, get element
         if isinstance(index, Number) and isinstance(index.value, int):
             idx = index.value
             if idx < 0:
                 raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
-            if idx < len(py_list):
+            if py_list is not None and idx < len(py_list):
                 new_subst = unify(elem, py_list[idx], subst)
                 if new_subst is not None:
                     yield new_subst
-            # Out of range: fail silently
+            # Out of range: fail (no match)
         elif isinstance(index, Number) and not isinstance(index.value, int):
             # Index is a number but not an integer
             raise PrologThrow(PrologError.type_error("integer", index))
@@ -321,6 +315,8 @@ class ListOperationsBuiltins:
 
         # Mode 2: Element is bound, find index (backtracking)
         elif not isinstance(elem, Variable):
+            if py_list is None:
+                raise PrologThrow(PrologError.type_error("list", lst))
             for i, item in enumerate(py_list):
                 if terms_equal(elem, item):
                     new_subst = unify(index, Number(i), subst)
@@ -328,28 +324,26 @@ class ListOperationsBuiltins:
                         yield new_subst
 
         # Mode 3: Generate list with element at index
-        elif isinstance(index, Number) and isinstance(index.value, int):
+        elif isinstance(index, Number) and isinstance(index.value, int) and isinstance(elem, Variable):
             idx = index.value
             if idx < 0:
                 raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
-            if isinstance(elem, Variable):
-                # Generate list with elem at position idx
-                if idx == 0:
-                    # [Elem | Tail] where Tail is fresh
-                    tail_var = engine._fresh_variable("Tail_")
-                    result_list = List((elem,), tail_var)
-                    new_subst = unify(lst, result_list, subst)
-                    if new_subst is not None:
-                        yield new_subst
-                else:
-                    # Build list with elem at idx
-                    prefix = [engine._fresh_variable(f"Elem{i}_") for i in range(idx)]
-                    tail_var = engine._fresh_variable("Tail_")
-                    elements = tuple(prefix) + (elem,) + (tail_var,)
-                    result_list = List(elements, None)
-                    new_subst = unify(lst, result_list, subst)
-                    if new_subst is not None:
-                        yield new_subst
+            if idx == 0:
+                # [Elem | Tail] where Tail is fresh
+                tail_var = engine._fresh_variable("Tail_")
+                result_list = List((elem,), tail_var)
+                new_subst = unify(lst, result_list, subst)
+                if new_subst is not None:
+                    yield new_subst
+            else:
+                # Build list with Elem variables followed by the tail
+                prefix = [engine._fresh_variable(f"Elem{i}_") for i in range(idx)]
+                tail_var = engine._fresh_variable("Tail_")
+                elements = tuple(prefix) + (elem, tail_var)
+                result_list = List(elements, tail_var)
+                new_subst = unify(lst, result_list, subst)
+                if new_subst is not None:
+                    yield new_subst
 
     @staticmethod
     def _builtin_nth1(
@@ -367,12 +361,12 @@ class ListOperationsBuiltins:
                 (zero_index, lst, elem), subst, engine
             )
         else:
-            # For backtracking mode, we need to handle the conversion
+            # For backtracking mode, use a single pre-created zero-based index var
+            zero_index_var = engine._fresh_variable("idx0_")
             for subst_result in ListOperationsBuiltins._builtin_nth0(
-                (Variable(), lst, elem), subst, engine
+                (zero_index_var, lst, elem), subst, engine
             ):
-                # Get the 0-based index from the result
-                zero_idx_term = deref(Variable(), subst_result)
+                zero_idx_term = deref(zero_index_var, subst_result)
                 if isinstance(zero_idx_term, Number) and isinstance(zero_idx_term.value, int):
                     one_idx = Number(zero_idx_term.value + 1)
                     final_subst = unify(index, one_idx, subst_result)
@@ -469,6 +463,11 @@ class ListOperationsBuiltins:
                 yield subst
                 return
             current = deref(current.tail, subst)
+
+        # If we ended on an explicit empty list tail (e.g., [a|[]])
+        if isinstance(current, Atom) and getattr(current, "name", "") == "[]":
+            yield subst
+            return
 
         # Not a proper list
         return
