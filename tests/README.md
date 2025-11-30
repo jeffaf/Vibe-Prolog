@@ -142,7 +142,6 @@ Comprehensive fixtures for exercising the interpreter across various features.
 - Tests higher-order predicates and meta-programming
 
 **Arithmetic (`arithmetic.pl`)**
-- `sum_list/2` - Accumulates sum of list elements
 - `greater_than/2` - Simple comparison
 - `product_list/2` - Accumulates product of list elements
 - Tests arithmetic operations and comparisons
