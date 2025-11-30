@@ -699,7 +699,8 @@ class TestByteIO:
             assert "error" in error_term
             type_error = error_term["error"][0]
             assert "type_error" in type_error
-            assert args[0] == "integer"
+            args = type_error["type_error"]
+            assert args[0] == "integer"  # put_byte requires integer type
 
             prolog.query_once(f"close({stream_handle})")
         finally:

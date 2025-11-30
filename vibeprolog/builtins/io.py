@@ -1302,6 +1302,28 @@ class IOBuiltins:
         return IOBuiltins._write_char_to_stream(stream, char, "put_code/2")
 
     @staticmethod
+    def _peek_raw_char(stream: Stream, context: str) -> str:
+        """Helper to peek at the next character from a stream without consuming it.
+
+        Returns the character string, or "" for EOF.
+        Raises PrologThrow on I/O errors.
+        """
+        try:
+            # Check pushback buffer first
+            if stream.pushback_buffer:
+                return stream.pushback_buffer[-1]  # Peek at top of stack
+            else:
+                # Read character and push it back
+                ch = stream.file_obj.read(1)
+                if ch:
+                    stream.pushback_buffer.append(ch)
+                return ch
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
     def _builtin_peek_char(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
@@ -1362,26 +1384,14 @@ class IOBuiltins:
         stream: Stream, char_var: Any, subst: Substitution, context: str
     ) -> Substitution | None:
         """Helper to peek at next character from a stream without consuming it."""
-        try:
-            # Check pushback buffer first
-            if stream.pushback_buffer:
-                ch = stream.pushback_buffer[-1]  # Peek at top of stack
-            else:
-                # Read character and push it back
-                ch = stream.file_obj.read(1)
-                if ch:
-                    stream.pushback_buffer.append(ch)
+        ch = IOBuiltins._peek_raw_char(stream, context)
 
-            if ch == "":
-                # EOF
-                return unify(char_var, Atom("end_of_file"), subst)
-            else:
-                # Return single character as atom
-                return unify(char_var, Atom(ch), subst)
-        except (OSError, IOError) as e:
-            # Handle I/O errors
-            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
-            raise PrologThrow(error_term)
+        if ch == "":
+            # EOF
+            return unify(char_var, Atom("end_of_file"), subst)
+        else:
+            # Return single character as atom
+            return unify(char_var, Atom(ch), subst)
 
     @staticmethod
     def _builtin_peek_code(
@@ -1444,26 +1454,14 @@ class IOBuiltins:
         stream: Stream, code_var: Any, subst: Substitution, context: str
     ) -> Substitution | None:
         """Helper to peek at next character code from a stream without consuming it."""
-        try:
-            # Check pushback buffer first
-            if stream.pushback_buffer:
-                ch = stream.pushback_buffer[-1]  # Peek at top of stack
-            else:
-                # Read character and push it back
-                ch = stream.file_obj.read(1)
-                if ch:
-                    stream.pushback_buffer.append(ch)
+        ch = IOBuiltins._peek_raw_char(stream, context)
 
-            if ch == "":
-                # EOF - return -1
-                return unify(code_var, Number(-1), subst)
-            else:
-                # Return character code as number
-                return unify(code_var, Number(ord(ch)), subst)
-        except (OSError, IOError) as e:
-            # Handle I/O errors
-            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
-            raise PrologThrow(error_term)
+        if ch == "":
+            # EOF - return -1
+            return unify(code_var, Number(-1), subst)
+        else:
+            # Return character code as number
+            return unify(code_var, Number(ord(ch)), subst)
 
     @staticmethod
     def _builtin_peek_byte(
@@ -1525,27 +1523,11 @@ class IOBuiltins:
     def _peek_byte_from_stream(
         stream: Stream, byte_var: Any, subst: Substitution, context: str
     ) -> Substitution | None:
-        """Helper to peek at next byte from a stream without consuming it."""
-        try:
-            # Check pushback buffer first
-            if stream.pushback_buffer:
-                ch = stream.pushback_buffer[-1]  # Peek at top of stack
-            else:
-                # Read character and push it back
-                ch = stream.file_obj.read(1)
-                if ch:
-                    stream.pushback_buffer.append(ch)
+        """Helper to peek at next byte from a stream without consuming it.
 
-            if ch == "":
-                # EOF - return -1
-                return unify(byte_var, Number(-1), subst)
-            else:
-                # Return byte value (0-255)
-                return unify(byte_var, Number(ord(ch)), subst)
-        except (OSError, IOError) as e:
-            # Handle I/O errors
-            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
-            raise PrologThrow(error_term)
+        Note: This is functionally identical to _peek_code_from_stream.
+        """
+        return IOBuiltins._peek_code_from_stream(stream, byte_var, subst, context)
 
     @staticmethod
     def _builtin_get_byte(
@@ -1607,24 +1589,11 @@ class IOBuiltins:
     def _read_byte_from_stream(
         stream: Stream, byte_var: Any, subst: Substitution, context: str
     ) -> Substitution | None:
-        """Helper to read a single byte from a stream."""
-        try:
-            # Check pushback buffer first
-            if stream.pushback_buffer:
-                ch = stream.pushback_buffer.pop()
-            else:
-                ch = stream.file_obj.read(1)
+        """Helper to read a single byte from a stream.
 
-            if ch == "":
-                # EOF - return -1
-                return unify(byte_var, Number(-1), subst)
-            else:
-                # Return byte value (0-255)
-                return unify(byte_var, Number(ord(ch)), subst)
-        except (OSError, IOError) as e:
-            # Handle I/O errors
-            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
-            raise PrologThrow(error_term)
+        Note: This is an alias for _read_code_from_stream since they're functionally identical.
+        """
+        return IOBuiltins._read_code_from_stream(stream, byte_var, subst, context)
 
     @staticmethod
     def _builtin_put_byte(
