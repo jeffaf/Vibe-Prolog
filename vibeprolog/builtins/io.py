@@ -182,6 +182,11 @@ class _TermReader:
 class IOBuiltins:
     """Built-ins for standard output and formatting."""
 
+    # Class-level stream stacks for see/tell
+    _input_stack = []
+    _output_stack = []
+    _stream_properties = {}  # Stream handle -> properties dict
+
     # =========================================================================
     # Stream Helper Methods
     # =========================================================================
@@ -293,6 +298,201 @@ class IOBuiltins:
         return stream
 
     @staticmethod
+    def _register_stream(handle, filename, mode, stream_type='text'):
+        """Register a stream with its properties."""
+        IOBuiltins._stream_properties[handle] = {
+            'file_name': filename,
+            'mode': mode,
+            'type': stream_type,
+            'input': mode in ['read', 'read_write'],
+            'output': mode in ['write', 'append', 'read_write'],
+        }
+
+    @staticmethod
+    def _unregister_stream(handle):
+        """Remove stream from property tracking."""
+        if handle in IOBuiltins._stream_properties:
+            del IOBuiltins._stream_properties[handle]
+
+    @staticmethod
+    def _builtin_see(args, subst, engine):
+        """see(+File) - Classic input redirection."""
+        file_term = args[0]
+        filename = deref(file_term, subst)
+
+        # Type check
+        if not isinstance(filename, Atom):
+            raise PrologThrow(PrologError.type_error("atom", filename, "see/1"))
+
+        try:
+            # Open file
+            handle = open(filename.name, 'r', encoding='utf-8')
+
+            # Save current input
+            current = getattr(engine, '_current_input_stream', USER_INPUT_STREAM)
+            IOBuiltins._input_stack.append(current)
+
+            # Set new input
+            engine._current_input_stream = Atom(f"stream_{id(handle)}")
+            engine.add_stream(Stream(handle=engine._current_input_stream, file_obj=handle, mode='read', filename=filename.name))
+            IOBuiltins._register_stream(engine._current_input_stream, filename.name, 'read')
+
+            yield subst
+
+        except FileNotFoundError:
+            raise PrologThrow(PrologError.existence_error("source_sink", filename, "see/1"))
+        except PermissionError:
+            raise PrologThrow(PrologError.permission_error("open", "source_sink", filename, "see/1"))
+
+    @staticmethod
+    def _builtin_seen(args, subst, engine):
+        """seen - Close classic input."""
+        if IOBuiltins._input_stack:
+            # Close current input
+            current_stream = getattr(engine, '_current_input_stream', USER_INPUT_STREAM)
+            if current_stream != USER_INPUT_STREAM:
+                stream = engine.get_stream(current_stream)
+                if stream:
+                    stream.close()
+                    engine.remove_stream(current_stream)
+                    IOBuiltins._unregister_stream(current_stream)
+
+            # Restore previous
+            engine._current_input_stream = IOBuiltins._input_stack.pop()
+
+        yield subst
+
+    @staticmethod
+    def _builtin_tell(args, subst, engine):
+        """tell(+File) - Classic output redirection."""
+        file_term = args[0]
+        filename = deref(file_term, subst)
+
+        if not isinstance(filename, Atom):
+            raise PrologThrow(PrologError.type_error("atom", filename, "tell/1"))
+
+        try:
+            handle = open(filename.name, 'w', encoding='utf-8')
+
+            current = getattr(engine, '_current_output_stream', USER_OUTPUT_STREAM)
+            IOBuiltins._output_stack.append(current)
+
+            engine._current_output_stream = Atom(f"stream_{id(handle)}")
+            engine.add_stream(Stream(handle=engine._current_output_stream, file_obj=handle, mode='write', filename=filename.name))
+            IOBuiltins._register_stream(engine._current_output_stream, filename.name, 'write')
+
+            yield subst
+
+        except Exception as e:
+            raise PrologThrow(PrologError.permission_error("open", "source_sink", filename, "tell/1"))
+
+    @staticmethod
+    def _builtin_told(args, subst, engine):
+        """told - Close classic output."""
+        if IOBuiltins._output_stack:
+            current_stream = getattr(engine, '_current_output_stream', USER_OUTPUT_STREAM)
+            if current_stream != USER_OUTPUT_STREAM:
+                stream = engine.get_stream(current_stream)
+                if stream:
+                    stream.close()
+                    engine.remove_stream(current_stream)
+                    IOBuiltins._unregister_stream(current_stream)
+
+            engine._current_output_stream = IOBuiltins._output_stack.pop()
+
+        yield subst
+
+    @staticmethod
+    def _builtin_get(args, subst, engine):
+        """get(-Code) - Read character code, skipping whitespace."""
+        code_term = args[0]
+
+        stream = IOBuiltins._get_input_stream(engine, "get/1")
+
+        # Skip whitespace
+        while True:
+            ch = IOBuiltins._read_raw_char(stream, "get/1")
+            if ch == "":
+                code = -1
+                break
+            if not ch.isspace():
+                code = ord(ch)
+                break
+
+        # Unify
+        new_subst = unify(code_term, Number(code), subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_get_stream(args, subst, engine):
+        """get(+Stream, -Code) - Read character code from stream."""
+        stream_term, code_term = args
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "get/2")
+
+        # Skip whitespace
+        while True:
+            ch = IOBuiltins._read_raw_char(stream, "get/2")
+            if ch == "":
+                code = -1
+                break
+            if not ch.isspace():
+                code = ord(ch)
+                break
+
+        # Unify
+        new_subst = unify(code_term, Number(code), subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _read_raw_char(stream, context):
+        """Helper to read a single character from stream."""
+        try:
+            if stream.pushback_buffer:
+                return stream.pushback_buffer.pop()
+            else:
+                ch = stream.file_obj.read(1)
+                return ch
+        except (OSError, IOError) as e:
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_put(args, subst, engine):
+        """put(+Code) - Write character code."""
+        code_term = args[0]
+        code = deref(code_term, subst)
+
+        if not isinstance(code, Number) or not isinstance(code.value, int):
+            raise PrologThrow(PrologError.type_error("integer", code, "put/1"))
+
+        if code.value < 0 or code.value > 1114111:
+            raise PrologThrow(PrologError.representation_error("character_code", "put/1"))
+
+        stream = IOBuiltins._get_output_stream(engine, "put/1")
+        IOBuiltins._write_char_to_stream(stream, chr(code.value), "put/1")
+
+        yield subst
+
+    @staticmethod
+    def _builtin_put_stream(args, subst, engine):
+        """put(+Stream, +Code) - Write character code to stream."""
+        stream_term, code_term = args
+        code = deref(code_term, subst)
+
+        if not isinstance(code, Number) or not isinstance(code.value, int):
+            raise PrologThrow(PrologError.type_error("integer", code, "put/2"))
+
+        if code.value < 0 or code.value > 1114111:
+            raise PrologThrow(PrologError.representation_error("character_code", "put/2"))
+
+        stream = IOBuiltins._get_output_stream_from_term(engine, stream_term, subst, "put/2")
+        IOBuiltins._write_char_to_stream(stream, chr(code.value), "put/2")
+
+        yield subst
+
+    @staticmethod
     def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
         """Register I/O predicate handlers."""
         # Existing predicates
@@ -340,6 +540,18 @@ class IOBuiltins:
         register_builtin(registry, "put_byte", 1, IOBuiltins._builtin_put_byte)
         register_builtin(registry, "put_byte", 2, IOBuiltins._builtin_put_byte_to_stream)
         register_builtin(registry, "nl", 1, IOBuiltins._builtin_newline_to_stream)
+
+        # Classic I/O predicates
+        register_builtin(registry, "see", 1, IOBuiltins._builtin_see)
+        register_builtin(registry, "seen", 0, IOBuiltins._builtin_seen)
+        register_builtin(registry, "tell", 1, IOBuiltins._builtin_tell)
+        register_builtin(registry, "told", 0, IOBuiltins._builtin_told)
+
+        # Character code I/O predicates
+        register_builtin(registry, "get", 1, IOBuiltins._builtin_get)
+        register_builtin(registry, "get", 2, IOBuiltins._builtin_get_stream)
+        register_builtin(registry, "put", 1, IOBuiltins._builtin_put)
+        register_builtin(registry, "put", 2, IOBuiltins._builtin_put_stream)
 
         # New ISO predicates
         register_builtin(registry, "read_term", 2, IOBuiltins._builtin_read_term)
