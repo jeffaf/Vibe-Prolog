@@ -1,6 +1,5 @@
 """Tests for character I/O predicates (get_char/1-2, put_char/1-2)."""
 
-import io
 import os
 import tempfile
 from contextlib import contextmanager
@@ -149,16 +148,9 @@ class TestPutChar:
                 content = f.read()
                 assert content == "Hello"
 
-    def test_put_char_invalid_character(self, prolog: PrologInterpreter):
+    def test_put_char_invalid_character(self, prolog: PrologInterpreter, write_stream):
         """Test put_char with invalid character raises type_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, _):
             # Try to write multi-character atom
             result = prolog.query_once(f"catch(put_char({stream_handle}, 'ab'), Error, true)")
             assert result is not None
@@ -177,10 +169,6 @@ class TestPutChar:
             type_error2 = error_term2["error"][0]
             assert "type_error" in type_error2
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
     def test_put_char_invalid_stream(self, prolog: PrologInterpreter):
         """Test put_char/2 with invalid stream raises existence_error."""
         result = prolog.query_once("catch(put_char(invalid_stream, 'a'), Error, true)")
@@ -192,18 +180,9 @@ class TestPutChar:
         args = existence_error["existence_error"]
         assert args[0] == "stream"
 
-    def test_put_char_read_only_stream(self, prolog: PrologInterpreter):
+    def test_put_char_read_only_stream(self, prolog: PrologInterpreter, read_stream):
         """Test put_char on read-only stream raises permission_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("test")
-            temp_file = f.name
-
-        try:
-            # Open for reading
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("test") as (stream_handle, _):
             # Try to write to read-only stream
             result = prolog.query_once(f"catch(put_char({stream_handle}, 'a'), Error, true)")
             assert result is not None
@@ -215,20 +194,9 @@ class TestPutChar:
             assert args[0] == "output"
             assert args[1] == "stream"
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_put_char_uninstantiated_args(self, prolog: PrologInterpreter):
+    def test_put_char_uninstantiated_args(self, prolog: PrologInterpreter, write_stream):
         """Test put_char with uninstantiated arguments raises instantiation_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, _):
             # Uninstantiated character
             result = prolog.query_once(f"catch(put_char({stream_handle}, Char), Error, true)")
             assert result is not None
@@ -245,25 +213,13 @@ class TestPutChar:
             instantiation_error2 = error_term2["error"][0]
             assert "instantiation_error" in instantiation_error2
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
 
 class TestCharIOEdgeCases:
     """Tests for edge cases in character I/O."""
 
-    def test_get_char_newline(self, prolog: PrologInterpreter):
+    def test_get_char_newline(self, prolog: PrologInterpreter, read_stream):
         """Test reading newline character."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("a\nb")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("a\nb") as (stream_handle, _):
             result1 = prolog.query_once(f"get_char({stream_handle}, Char1)")
             assert result1["Char1"] == "a"
 
@@ -273,20 +229,9 @@ class TestCharIOEdgeCases:
             result3 = prolog.query_once(f"get_char({stream_handle}, Char3)")
             assert result3["Char3"] == "b"
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_put_char_special_chars(self, prolog: PrologInterpreter):
+    def test_put_char_special_chars(self, prolog: PrologInterpreter, write_stream):
         """Test writing special characters."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, temp_file):
             # Write various special characters
             assert prolog.query_once(f"put_char({stream_handle}, '\\n')") == {}
             assert prolog.query_once(f"put_char({stream_handle}, '\\t')") == {}
@@ -297,24 +242,14 @@ class TestCharIOEdgeCases:
             with open(temp_file, 'r') as f:
                 content = f.read()
                 assert content == "\n\t "
-        finally:
-            os.unlink(temp_file)
 
 
 class TestCharacterCodeIO:
     """Tests for get_code/1-2 and put_code/1-2 predicates."""
 
-    def test_get_code_from_stream(self, prolog: PrologInterpreter):
+    def test_get_code_from_stream(self, prolog: PrologInterpreter, read_stream):
         """Test reading character codes from a stream."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("ABC")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("ABC") as (stream_handle, _):
             # Read 'A' (code 65)
             result1 = prolog.query_once(f"get_code({stream_handle}, Code1)")
             assert result1 is not None
@@ -335,20 +270,9 @@ class TestCharacterCodeIO:
             assert result4 is not None
             assert result4["Code4"] == -1
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_put_code_to_stream(self, prolog: PrologInterpreter):
+    def test_put_code_to_stream(self, prolog: PrologInterpreter, write_stream):
         """Test writing character codes to a stream."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, temp_file):
             # Write 'H' (72), 'i' (105), '!' (33)
             assert prolog.query_once(f"put_code({stream_handle}, 72)") == {}
             assert prolog.query_once(f"put_code({stream_handle}, 105)") == {}
@@ -359,19 +283,10 @@ class TestCharacterCodeIO:
             with open(temp_file, 'r') as f:
                 content = f.read()
                 assert content == "Hi!"
-        finally:
-            os.unlink(temp_file)
 
-    def test_put_code_invalid_code(self, prolog: PrologInterpreter):
+    def test_put_code_invalid_code(self, prolog: PrologInterpreter, write_stream):
         """Test put_code with invalid character code raises domain_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, _):
             # Negative code
             result = prolog.query_once(f"catch(put_code({stream_handle}, -1), Error, true)")
             assert result is not None
@@ -382,20 +297,9 @@ class TestCharacterCodeIO:
             args = domain_error["domain_error"]
             assert args[0] == "character_code"
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_put_code_non_integer(self, prolog: PrologInterpreter):
+    def test_put_code_non_integer(self, prolog: PrologInterpreter, write_stream):
         """Test put_code with non-integer raises type_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, _):
             # Atom instead of integer
             result = prolog.query_once(f"catch(put_code({stream_handle}, abc), Error, true)")
             assert result is not None
@@ -403,10 +307,6 @@ class TestCharacterCodeIO:
             assert "error" in error_term
             type_error = error_term["error"][0]
             assert "type_error" in type_error
-
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
 
     def test_get_code_invalid_stream(self, prolog: PrologInterpreter):
         """Test get_code/2 with invalid stream raises existence_error."""
@@ -446,17 +346,9 @@ class TestPeekOperations:
             assert result4 is not None
             assert result4["Char4"] == "Y"
 
-    def test_peek_code_from_stream(self, prolog: PrologInterpreter):
+    def test_peek_code_from_stream(self, prolog: PrologInterpreter, read_stream):
         """Test peeking at character codes without consuming them."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("AB")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("AB") as (stream_handle, _):
             # Peek at 'A' (code 65) - should not consume
             result1 = prolog.query_once(f"peek_code({stream_handle}, Code1)")
             assert result1 is not None
@@ -477,21 +369,9 @@ class TestPeekOperations:
             assert result4 is not None
             assert result4["Code4"] == 66
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_peek_byte_from_stream(self, prolog: PrologInterpreter):
+    def test_peek_byte_from_stream(self, prolog: PrologInterpreter, read_stream):
         """Test peeking at bytes without consuming them."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("12")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("12") as (stream_handle, _):
             # Peek at '1' (code 49) - should not consume
             result1 = prolog.query_once(f"peek_byte({stream_handle}, Byte1)")
             assert result1 is not None
@@ -512,66 +392,26 @@ class TestPeekOperations:
             assert result4 is not None
             assert result4["Byte4"] == 50
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_peek_char_eof(self, prolog: PrologInterpreter):
+    def test_peek_char_eof(self, prolog: PrologInterpreter, read_stream):
         """Test peek_char at EOF returns end_of_file."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("") as (stream_handle, _):
             result = prolog.query_once(f"peek_char({stream_handle}, Char)")
             assert result is not None
             assert result["Char"] == "end_of_file"
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_peek_code_eof(self, prolog: PrologInterpreter):
+    def test_peek_code_eof(self, prolog: PrologInterpreter, read_stream):
         """Test peek_code at EOF returns -1."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("") as (stream_handle, _):
             result = prolog.query_once(f"peek_code({stream_handle}, Code)")
             assert result is not None
             assert result["Code"] == -1
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_peek_byte_eof(self, prolog: PrologInterpreter):
+    def test_peek_byte_eof(self, prolog: PrologInterpreter, read_stream):
         """Test peek_byte at EOF returns -1."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("") as (stream_handle, _):
             result = prolog.query_once(f"peek_byte({stream_handle}, Byte)")
             assert result is not None
             assert result["Byte"] == -1
-
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
 
     def test_peek_invalid_stream(self, prolog: PrologInterpreter):
         """Test peek operations with invalid stream raise existence_error."""
@@ -591,17 +431,9 @@ class TestPeekOperations:
 class TestByteIO:
     """Tests for get_byte/1-2 and put_byte/1-2 predicates."""
 
-    def test_get_byte_from_stream(self, prolog: PrologInterpreter):
+    def test_get_byte_from_stream(self, prolog: PrologInterpreter, read_stream):
         """Test reading bytes from a stream."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("abc")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("abc") as (stream_handle, _):
             # Read 'a' (byte 97)
             result1 = prolog.query_once(f"get_byte({stream_handle}, Byte1)")
             assert result1 is not None
@@ -622,20 +454,9 @@ class TestByteIO:
             assert result4 is not None
             assert result4["Byte4"] == -1
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_put_byte_to_stream(self, prolog: PrologInterpreter):
+    def test_put_byte_to_stream(self, prolog: PrologInterpreter, write_stream):
         """Test writing bytes to a stream."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, temp_file):
             # Write bytes for 'OK!'
             assert prolog.query_once(f"put_byte({stream_handle}, 79)") == {}  # 'O'
             assert prolog.query_once(f"put_byte({stream_handle}, 75)") == {}  # 'K'
@@ -646,19 +467,10 @@ class TestByteIO:
             with open(temp_file, 'r') as f:
                 content = f.read()
                 assert content == "OK!"
-        finally:
-            os.unlink(temp_file)
 
-    def test_put_byte_out_of_range(self, prolog: PrologInterpreter):
+    def test_put_byte_out_of_range(self, prolog: PrologInterpreter, write_stream):
         """Test put_byte with out-of-range value raises domain_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, _):
             # Byte > 255
             result1 = prolog.query_once(f"catch(put_byte({stream_handle}, 256), Error, true)")
             assert result1 is not None
@@ -679,20 +491,9 @@ class TestByteIO:
             args2 = domain_error2["domain_error"]
             assert args2[0] == "byte"
 
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
-
-    def test_put_byte_non_integer(self, prolog: PrologInterpreter):
+    def test_put_byte_non_integer(self, prolog: PrologInterpreter, write_stream):
         """Test put_byte with non-integer raises type_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, _):
             result = prolog.query_once(f"catch(put_byte({stream_handle}, 3.14), Error, true)")
             assert result is not None
             error_term = result["Error"]
@@ -701,10 +502,6 @@ class TestByteIO:
             assert "type_error" in type_error
             args = type_error["type_error"]
             assert args[0] == "integer"  # put_byte requires integer type
-
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)
 
     def test_get_byte_invalid_stream(self, prolog: PrologInterpreter):
         """Test get_byte/2 with invalid stream raises existence_error."""
@@ -721,16 +518,9 @@ class TestByteIO:
 class TestNlStreamVariant:
     """Tests for nl/1 predicate."""
 
-    def test_nl_to_stream(self, prolog: PrologInterpreter):
+    def test_nl_to_stream(self, prolog: PrologInterpreter, write_stream):
         """Test writing newline to a specified stream."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', write, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with write_stream() as (stream_handle, temp_file):
             # Write some text and newlines
             assert prolog.query_once(f"put_char({stream_handle}, 'A')") == {}
             assert prolog.query_once(f"nl({stream_handle})") == {}
@@ -742,8 +532,6 @@ class TestNlStreamVariant:
             with open(temp_file, 'r') as f:
                 content = f.read()
                 assert content == "A\nB\n"
-        finally:
-            os.unlink(temp_file)
 
     def test_nl_invalid_stream(self, prolog: PrologInterpreter):
         """Test nl/1 with invalid stream raises existence_error."""
@@ -756,17 +544,9 @@ class TestNlStreamVariant:
         args = existence_error["existence_error"]
         assert args[0] == "stream"
 
-    def test_nl_read_only_stream(self, prolog: PrologInterpreter):
+    def test_nl_read_only_stream(self, prolog: PrologInterpreter, read_stream):
         """Test nl/1 on read-only stream raises permission_error."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-            f.write("test")
-            temp_file = f.name
-
-        try:
-            open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
-            assert open_result is not None
-            stream_handle = open_result["Stream"]
-
+        with read_stream("test") as (stream_handle, _):
             result = prolog.query_once(f"catch(nl({stream_handle}), Error, true)")
             assert result is not None
             error_term = result["Error"]
@@ -776,7 +556,3 @@ class TestNlStreamVariant:
             args = permission_error["permission_error"]
             assert args[0] == "output"
             assert args[1] == "stream"
-
-            prolog.query_once(f"close({stream_handle})")
-        finally:
-            os.unlink(temp_file)

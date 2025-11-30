@@ -154,6 +154,116 @@ class _TermReader:
 class IOBuiltins:
     """Built-ins for standard output and formatting."""
 
+    # =========================================================================
+    # Stream Helper Methods
+    # =========================================================================
+
+    @staticmethod
+    def _get_input_stream(engine: EngineContext, context: str) -> Stream:
+        """Gets the current input stream and validates its permissions.
+
+        Args:
+            engine: The execution engine
+            context: The context string for error messages (e.g., "get_char/1")
+
+        Returns:
+            The validated input stream
+
+        Raises:
+            PrologThrow: If stream doesn't exist or lacks read permission
+        """
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, context)
+            raise PrologThrow(error_term)
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+        return stream
+
+    @staticmethod
+    def _get_input_stream_from_term(
+        engine: EngineContext, stream_term: Any, subst: Substitution, context: str
+    ) -> Stream:
+        """Gets an input stream from a term and validates it.
+
+        Args:
+            engine: The execution engine
+            stream_term: The stream reference term
+            subst: The current substitution
+            context: The context string for error messages (e.g., "get_char/2")
+
+        Returns:
+            The validated input stream
+
+        Raises:
+            PrologThrow: If stream_term is uninstantiated, invalid, doesn't exist, or lacks read permission
+        """
+        engine._check_instantiated(stream_term, subst, context)
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, context)
+        stream_term = deref(stream_term, subst)
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, context)
+            raise PrologThrow(error_term)
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, context)
+            raise PrologThrow(error_term)
+        return stream
+
+    @staticmethod
+    def _get_output_stream(engine: EngineContext, context: str) -> Stream:
+        """Gets the current output stream and validates its permissions.
+
+        Args:
+            engine: The execution engine
+            context: The context string for error messages (e.g., "put_char/1")
+
+        Returns:
+            The validated output stream
+
+        Raises:
+            PrologThrow: If stream doesn't exist or lacks write permission
+        """
+        stream = engine.get_stream(USER_OUTPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_OUTPUT_STREAM, context)
+            raise PrologThrow(error_term)
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+        return stream
+
+    @staticmethod
+    def _get_output_stream_from_term(
+        engine: EngineContext, stream_term: Any, subst: Substitution, context: str
+    ) -> Stream:
+        """Gets an output stream from a term and validates it.
+
+        Args:
+            engine: The execution engine
+            stream_term: The stream reference term
+            subst: The current substitution
+            context: The context string for error messages (e.g., "put_char/2")
+
+        Returns:
+            The validated output stream
+
+        Raises:
+            PrologThrow: If stream_term is uninstantiated, invalid, doesn't exist, or lacks write permission
+        """
+        engine._check_instantiated(stream_term, subst, context)
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, context)
+        stream_term = deref(stream_term, subst)
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, context)
+            raise PrologThrow(error_term)
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, context)
+            raise PrologThrow(error_term)
+        return stream
+
     @staticmethod
     def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
         """Register I/O predicate handlers."""
@@ -778,15 +888,7 @@ class IOBuiltins:
             return None
 
         term_arg = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "read/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream.handle, "read/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream(engine, "read/1")
         return IOBuiltins._read_and_unify_stream(stream, term_arg, subst, "read/1")
 
     @staticmethod
@@ -797,21 +899,7 @@ class IOBuiltins:
             return None
 
         stream_term, term_arg = args
-
-        engine._check_instantiated(stream_term, subst, "read/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "read/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "read/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream_term, "read/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "read/2")
         return IOBuiltins._read_and_unify_stream(stream, term_arg, subst, "read/2")
 
     @staticmethod
@@ -963,15 +1051,7 @@ class IOBuiltins:
             return None
 
         char_var = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "get_char/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream.handle, "get_char/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream(engine, "get_char/1")
         return IOBuiltins._read_char_from_stream(stream, char_var, subst, "get_char/1")
 
     @staticmethod
@@ -988,21 +1068,7 @@ class IOBuiltins:
             return None
 
         stream_term, char_var = args
-
-        engine._check_instantiated(stream_term, subst, "get_char/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "get_char/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "get_char/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream_term, "get_char/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "get_char/2")
         return IOBuiltins._read_char_from_stream(stream, char_var, subst, "get_char/2")
 
     @staticmethod
@@ -1055,15 +1121,7 @@ class IOBuiltins:
             error_term = PrologError.type_error("in_character", char_term, "put_char/1")
             raise PrologThrow(error_term)
 
-        stream = engine.get_stream(USER_OUTPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_OUTPUT_STREAM, "put_char/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream.handle, "put_char/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_output_stream(engine, "put_char/1")
         return IOBuiltins._write_char_to_stream(stream, char_term.name, "put_char/1")
 
     @staticmethod
@@ -1080,11 +1138,7 @@ class IOBuiltins:
 
         stream_term, char_term = args
 
-        engine._check_instantiated(stream_term, subst, "put_char/2")
         engine._check_instantiated(char_term, subst, "put_char/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "put_char/2")
-
-        stream_term = deref(stream_term, subst)
         char_term = deref(char_term, subst)
 
         # Validate that it's a single character atom
@@ -1096,15 +1150,7 @@ class IOBuiltins:
             error_term = PrologError.type_error("in_character", char_term, "put_char/2")
             raise PrologThrow(error_term)
 
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "put_char/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream_term, "put_char/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_output_stream_from_term(engine, stream_term, subst, "put_char/2")
         return IOBuiltins._write_char_to_stream(stream, char_term.name, "put_char/2")
 
     @staticmethod
@@ -1133,15 +1179,7 @@ class IOBuiltins:
             return None
 
         code_var = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "get_code/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream.handle, "get_code/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream(engine, "get_code/1")
         return IOBuiltins._read_code_from_stream(stream, code_var, subst, "get_code/1")
 
     @staticmethod
@@ -1158,21 +1196,7 @@ class IOBuiltins:
             return None
 
         stream_term, code_var = args
-
-        engine._check_instantiated(stream_term, subst, "get_code/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "get_code/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "get_code/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream_term, "get_code/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "get_code/2")
         return IOBuiltins._read_code_from_stream(stream, code_var, subst, "get_code/2")
 
     @staticmethod
@@ -1235,15 +1259,7 @@ class IOBuiltins:
             error_term = PrologError.domain_error("character_code", code_term, "put_code/1")
             raise PrologThrow(error_term)
 
-        stream = engine.get_stream(USER_OUTPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_OUTPUT_STREAM, "put_code/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream.handle, "put_code/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_output_stream(engine, "put_code/1")
         return IOBuiltins._write_char_to_stream(stream, char, "put_code/1")
 
     @staticmethod
@@ -1261,11 +1277,7 @@ class IOBuiltins:
 
         stream_term, code_term = args
 
-        engine._check_instantiated(stream_term, subst, "put_code/2")
         engine._check_instantiated(code_term, subst, "put_code/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "put_code/2")
-
-        stream_term = deref(stream_term, subst)
         code_term = deref(code_term, subst)
 
         # Validate that it's an integer
@@ -1286,15 +1298,7 @@ class IOBuiltins:
             error_term = PrologError.domain_error("character_code", code_term, "put_code/2")
             raise PrologThrow(error_term)
 
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "put_code/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream_term, "put_code/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_output_stream_from_term(engine, stream_term, subst, "put_code/2")
         return IOBuiltins._write_char_to_stream(stream, char, "put_code/2")
 
     @staticmethod
@@ -1333,15 +1337,7 @@ class IOBuiltins:
             return None
 
         char_var = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "peek_char/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream.handle, "peek_char/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream(engine, "peek_char/1")
         return IOBuiltins._peek_char_from_stream(stream, char_var, subst, "peek_char/1")
 
     @staticmethod
@@ -1358,21 +1354,7 @@ class IOBuiltins:
             return None
 
         stream_term, char_var = args
-
-        engine._check_instantiated(stream_term, subst, "peek_char/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "peek_char/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "peek_char/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream_term, "peek_char/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "peek_char/2")
         return IOBuiltins._peek_char_from_stream(stream, char_var, subst, "peek_char/2")
 
     @staticmethod
@@ -1403,15 +1385,7 @@ class IOBuiltins:
             return None
 
         code_var = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "peek_code/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream.handle, "peek_code/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream(engine, "peek_code/1")
         return IOBuiltins._peek_code_from_stream(stream, code_var, subst, "peek_code/1")
 
     @staticmethod
@@ -1428,21 +1402,7 @@ class IOBuiltins:
             return None
 
         stream_term, code_var = args
-
-        engine._check_instantiated(stream_term, subst, "peek_code/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "peek_code/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "peek_code/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream_term, "peek_code/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "peek_code/2")
         return IOBuiltins._peek_code_from_stream(stream, code_var, subst, "peek_code/2")
 
     @staticmethod
@@ -1473,15 +1433,7 @@ class IOBuiltins:
             return None
 
         byte_var = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "peek_byte/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream.handle, "peek_byte/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream(engine, "peek_byte/1")
         return IOBuiltins._peek_byte_from_stream(stream, byte_var, subst, "peek_byte/1")
 
     @staticmethod
@@ -1498,21 +1450,7 @@ class IOBuiltins:
             return None
 
         stream_term, byte_var = args
-
-        engine._check_instantiated(stream_term, subst, "peek_byte/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "peek_byte/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "peek_byte/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream_term, "peek_byte/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "peek_byte/2")
         return IOBuiltins._peek_byte_from_stream(stream, byte_var, subst, "peek_byte/2")
 
     @staticmethod
@@ -1539,15 +1477,7 @@ class IOBuiltins:
             return None
 
         byte_var = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "get_byte/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream.handle, "get_byte/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream(engine, "get_byte/1")
         return IOBuiltins._read_byte_from_stream(stream, byte_var, subst, "get_byte/1")
 
     @staticmethod
@@ -1564,21 +1494,7 @@ class IOBuiltins:
             return None
 
         stream_term, byte_var = args
-
-        engine._check_instantiated(stream_term, subst, "get_byte/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "get_byte/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "get_byte/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("read", "append"):
-            error_term = PrologError.permission_error("input", "stream", stream_term, "get_byte/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "get_byte/2")
         return IOBuiltins._read_byte_from_stream(stream, byte_var, subst, "get_byte/2")
 
     @staticmethod
@@ -1624,15 +1540,7 @@ class IOBuiltins:
 
         char = chr(byte_value)
 
-        stream = engine.get_stream(USER_OUTPUT_STREAM)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", USER_OUTPUT_STREAM, "put_byte/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream.handle, "put_byte/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_output_stream(engine, "put_byte/1")
         return IOBuiltins._write_char_to_stream(stream, char, "put_byte/1")
 
     @staticmethod
@@ -1650,11 +1558,7 @@ class IOBuiltins:
 
         stream_term, byte_term = args
 
-        engine._check_instantiated(stream_term, subst, "put_byte/2")
         engine._check_instantiated(byte_term, subst, "put_byte/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "put_byte/2")
-
-        stream_term = deref(stream_term, subst)
         byte_term = deref(byte_term, subst)
 
         # Validate that it's an integer
@@ -1671,15 +1575,7 @@ class IOBuiltins:
 
         char = chr(byte_value)
 
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "put_byte/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream_term, "put_byte/2")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_output_stream_from_term(engine, stream_term, subst, "put_byte/2")
         return IOBuiltins._write_char_to_stream(stream, char, "put_byte/2")
 
     @staticmethod
@@ -1695,21 +1591,7 @@ class IOBuiltins:
             return None
 
         stream_term = args[0]
-
-        engine._check_instantiated(stream_term, subst, "nl/1")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "nl/1")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "nl/1")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream_term, "nl/1")
-            raise PrologThrow(error_term)
-
+        stream = IOBuiltins._get_output_stream_from_term(engine, stream_term, subst, "nl/1")
         return IOBuiltins._write_char_to_stream(stream, "\n", "nl/1")
 
 
