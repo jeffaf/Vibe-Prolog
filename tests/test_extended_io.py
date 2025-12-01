@@ -63,6 +63,118 @@ class TestCharacterCodeIO:
             prolog.query_once("put(-1)")
         assert "representation_error" in str(exc_info.value)
 
+    def test_put_with_single_char_atom(self, capsys):
+        """put/1 with single-character atom writes character."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("put(a)")  # 'a'
+        assert result is not None
+        captured = capsys.readouterr()
+        assert captured.out == 'a'
+
+    def test_put_with_special_chars(self, capsys):
+        """put/1 with special character atoms."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("put('*'), put('-'), put('+')")
+        assert result is not None
+        captured = capsys.readouterr()
+        assert captured.out == '*-+'
+
+    def test_put_with_multi_char_atom_fails(self):
+        """put/1 with multi-character atom raises type_error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("put(abc)")
+        assert "type_error" in str(exc_info.value)
+
+    def test_put_with_invalid_type_fails(self):
+        """put/1 with invalid type (list) raises type_error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("put([a,b])")
+        assert "type_error" in str(exc_info.value)
+
+    def test_put_with_unicode_atom(self, capsys):
+        """put/1 with Unicode character atoms."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("put('€')")
+        assert result is not None
+        captured = capsys.readouterr()
+        assert captured.out == '€'
+
+
+class TestPutStream:
+    """Test put/2 with streams."""
+
+    def test_put_stream_with_code(self, tmp_path):
+        """put/2 with integer character code to stream."""
+        test_file = tmp_path / "put_test.txt"
+        filename = str(test_file)
+
+        prolog = PrologInterpreter()
+        open_result = prolog.query_once(f"open('{filename}', write, S)")
+        stream_handle = open_result["S"]
+        result = prolog.query_once(f"put({stream_handle}, 65)")  # 'A'
+        assert result is not None
+        prolog.query_once(f"close({stream_handle})")
+
+        content = test_file.read_text()
+        assert content == 'A'
+
+    def test_put_stream_with_atom(self, tmp_path):
+        """put/2 with single-character atom to stream."""
+        test_file = tmp_path / "put_test.txt"
+        filename = str(test_file)
+
+        prolog = PrologInterpreter()
+        open_result = prolog.query_once(f"open('{filename}', write, S)")
+        stream_handle = open_result["S"]
+        result = prolog.query_once(f"put({stream_handle}, a)")
+        assert result is not None
+        prolog.query_once(f"close({stream_handle})")
+
+        content = test_file.read_text()
+        assert content == 'a'
+
+    def test_put_stream_with_special_chars(self, tmp_path):
+        """put/2 with special character atoms to stream."""
+        test_file = tmp_path / "put_test.txt"
+        filename = str(test_file)
+
+        prolog = PrologInterpreter()
+        open_result = prolog.query_once(f"open('{filename}', write, S)")
+        stream_handle = open_result["S"]
+        prolog.query_once(f"put({stream_handle}, '*'), put({stream_handle}, '-'), put({stream_handle}, '+')")
+        prolog.query_once(f"close({stream_handle})")
+
+        content = test_file.read_text()
+        assert content == '*-+'
+
+    def test_put_stream_with_multi_char_atom_fails(self, tmp_path):
+        """put/2 with multi-character atom raises type_error."""
+        test_file = tmp_path / "put_test.txt"
+        filename = str(test_file)
+
+        prolog = PrologInterpreter()
+        open_result = prolog.query_once(f"open('{filename}', write, S)")
+        stream_handle = open_result["S"]
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once(f"put({stream_handle}, abc)")
+        assert "type_error" in str(exc_info.value)
+        prolog.query_once(f"close({stream_handle})")
+
+    def test_put_stream_with_invalid_type_fails(self, tmp_path):
+        """put/2 with invalid type raises type_error."""
+        test_file = tmp_path / "put_test.txt"
+        filename = str(test_file)
+
+        prolog = PrologInterpreter()
+        open_result = prolog.query_once(f"open('{filename}', write, S)")
+        stream_handle = open_result["S"]
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once(f"put({stream_handle}, [a,b])")
+        assert "type_error" in str(exc_info.value)
+        prolog.query_once(f"close({stream_handle})")
+
 
 class TestStreamProperties:
     """Test stream_property/2."""
