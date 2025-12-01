@@ -282,11 +282,12 @@ class HigherOrderBuiltins:
             else:
                 raise PrologThrow(PrologError.type_error("callable", pred, context))
 
-            solutions = list(engine._solve_goals([goal], subst))
-            if not solutions:
+            try:
+                solution = next(engine._solve_goals([goal], subst))
+            except StopIteration:
                 return  # No solution, fail
 
-            current_acc = deref(acc, solutions[0])
+            current_acc = deref(acc, solution)
 
         new_subst = unify(acc, current_acc, subst)
         if new_subst is not None:

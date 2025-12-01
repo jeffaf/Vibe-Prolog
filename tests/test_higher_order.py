@@ -33,7 +33,7 @@ class TestMaplist3:
 
     def test_maplist_3_type_error_non_list(self, prolog):
         """Test maplist/3 with non-list."""
-        with pytest.raises(Exception):  # Should raise type_error
+        with pytest.raises(PrologThrow):  # Should raise type_error
             prolog.query_once("maplist(=, atom, [a]).")
 
     def test_maplist_3_type_error_non_callable(self, prolog):
@@ -45,10 +45,15 @@ class TestMaplist3:
 class TestMaplist4:
     """Tests for maplist/4 predicate."""
 
+    def test_maplist_4_basic(self, prolog):
+        """Test basic maplist/4 functionality."""
+        prolog.consult_string("sum(A, B, C) :- C is A + B.")
+        result = prolog.query_once("maplist(sum, [1, 2], [10, 20], X).")
+        assert result is not None
+        assert result['X'] == [11, 22]
+
     def test_maplist_4_different_lengths(self, prolog):
         """Test maplist/4 fails with different list lengths."""
-        # Since we can't easily test success without defining a 3-ary predicate,
-        # we just test the failure case for different lengths
         assert not prolog.has_solution("maplist(=, [a,b], [c,d], [e]).")
 
 
@@ -191,8 +196,13 @@ class TestFoldl5:
 
     def test_foldl_5_basic(self, prolog):
         """Test basic foldl/5 functionality."""
-        # This is tricky to test with built-ins, so we'll just test that it doesn't crash
-        # and handles length mismatch properly
+        prolog.consult_string("sum_acc(X, Y, Acc, NewAcc) :- NewAcc is X + Y + Acc.")
+        result = prolog.query_once("foldl(sum_acc, [1, 2], [10, 20], 0, Result).")
+        assert result is not None
+        assert result['Result'] == 33  # (0 + 1 + 10) -> 11, (11 + 2 + 20) -> 33
+
+    def test_foldl_5_length_mismatch(self, prolog):
+        """Test foldl/5 fails with lists of different lengths."""
         assert not prolog.has_solution("foldl(plus, [1,2], [3], 0, X).")
 
 
