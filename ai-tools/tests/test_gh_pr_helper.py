@@ -104,9 +104,6 @@ class TestFetchAPI:
         with pytest.raises(GitHubJSONError, match="Failed to parse JSON"):
             fetch_api("/repos/owner/repo/issues/1/comments")
 
-    def test_fail(self):
-        assert(True is False)
-
 
 class TestFetchReviewThreadsPage:
     """Tests for _fetch_review_threads_page function."""
