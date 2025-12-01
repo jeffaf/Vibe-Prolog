@@ -39,6 +39,11 @@ class Cut:
         return "!"
 
 
+@dataclass(frozen=True)
+class ParenthesizedComma(Compound):
+    """Marker type for comma terms wrapped in parentheses to prevent flattening."""
+
+
 @dataclass
 class Clause:
     """A Prolog clause (fact or rule)."""
@@ -132,7 +137,7 @@ __OPERATOR_GRAMMAR__
         | atom
         | variable
         | list
-        | "(" term ")"
+        | "(" term ")"                     -> parenthesized_term
 
     compound: atom "(" args ")"
     operator_atom: OPERATOR_ATOM
@@ -275,19 +280,24 @@ class PrologTransformer(Transformer):
 
     def _flatten_comma_separated(self, items):
         """Flatten comma-separated predicates into a list.
-        
+
         If items is a list with a single Compound with functor ',',
         unwrap it into a flat list of indicators.
         """
-        if isinstance(items, list) and len(items) == 1:
-            item = items[0]
-            if isinstance(item, Compound) and item.functor == ',':
-                # Flatten comma compound
-                return self._collect_comma_terms(item)
-        return items
+        if isinstance(items, ParenthesizedComma):
+            items = Compound(items.functor, items.args)
+        if isinstance(items, Compound) and items.functor == ',':
+            return self._collect_comma_terms(items)
+        if isinstance(items, (list, tuple)) and len(items) == 1:
+            return self._flatten_comma_separated(items[0])
+        if isinstance(items, (list, tuple)):
+            return items
+        return [items]
 
     def _collect_comma_terms(self, compound):
         """Recursively collect terms from a comma compound."""
+        if isinstance(compound, ParenthesizedComma):
+            return [Compound(compound.functor, compound.args)]
         if isinstance(compound, Compound) and compound.functor == ',':
             left = self._collect_comma_terms(compound.args[0])
             right = self._collect_comma_terms(compound.args[1])
@@ -314,6 +324,8 @@ class PrologTransformer(Transformer):
         # This handles cases where ambiguous parsing creates comma compounds
         result = []
         for item in items:
+            if isinstance(item, ParenthesizedComma):
+                item = Compound(item.functor, item.args)
             if isinstance(item, Compound) and item.functor == ',':
                 result.extend(self._collect_comma_terms(item))
             else:
@@ -369,12 +381,6 @@ class PrologTransformer(Transformer):
 
     def _apply_prefix_operator(self, op, term):
         op_str = str(op)
-        if op_str == "-" and isinstance(term, Number):
-            if isinstance(term.value, int):
-                return Number(-term.value)
-            return Number(-term.value)
-        if op_str == "+" and isinstance(term, Number):
-            return Number(term.value)
         return Compound(op_str, (term,))
 
     def module_term(self, items):
@@ -461,6 +467,12 @@ class PrologTransformer(Transformer):
     def primary(self, items):
         return items[0]
 
+    def parenthesized_term(self, items):
+        term = items[0]
+        if isinstance(term, Compound) and term.functor == ',':
+            return ParenthesizedComma(term.functor, term.args)
+        return term
+
     def special_atom_token(self, items):
         """Convert SPECIAL_ATOM_OPS token to an Atom."""
         token_str = str(items[0])
@@ -474,10 +486,23 @@ class PrologTransformer(Transformer):
     def args(self, items):
         expanded: list[Any] = []
         for item in items:
+            if isinstance(item, ParenthesizedComma):
+                expanded.append(Compound(item.functor, item.args))
+                continue
+
             if isinstance(item, Compound) and item.functor == ',':
                 expanded.extend(self._collect_comma_terms(item))
-            else:
-                expanded.append(item)
+                continue
+
+            if isinstance(item, Compound):
+                normalized_args = tuple(
+                    Compound(arg.functor, arg.args)
+                    if isinstance(arg, ParenthesizedComma)
+                    else arg
+                    for arg in item.args
+                )
+                item = Compound(item.functor, normalized_args)
+            expanded.append(item)
         return expanded
 
     def empty_list(self, items):
@@ -586,15 +611,12 @@ class PrologTransformer(Transformer):
             return Number(int(value))
 
     def negative_number(self, items):
-        # items[0] is the dash, items[1] is the number
-        num = items[1]
-        # Negate the number
+        # items may contain only the numeric token since the leading "-" is a
+        # literal in the grammar; guard against short lists to avoid crashes.
+        num = items[-1]
         if isinstance(num, Number):
-            if isinstance(num.value, int):
-                return Number(-num.value)
-            else:
-                return Number(-num.value)
-        return num
+            return Compound("-", (num,))
+        return Compound("-", (self.number([f"-{num}"]),))
 
     def _parse_base_number(self, value):
         """Parse base'digits syntax like 16'ff or -2'abcd."""
@@ -985,15 +1007,20 @@ DEFAULT_OPERATORS: list[tuple[int, str, str]] = [
     (400, "yfx", "/"),
     (400, "yfx", "//"),
     (400, "yfx", "mod"),
-    (200, "xfx", "**"),
+    (200, "xfy", "**"),
     (200, "fy", "+"),
     (200, "fy", "-"),
 ]
 
 
 def _format_operator_literals(ops: Iterable[str]) -> str:
-    escaped = [f'"{escape_for_lark(op)}"' for op in ops]
-    return " | ".join(sorted(set(escaped)))
+    formatted: list[str] = []
+    for op in sorted(set(ops)):
+        if re.match(r"^[A-Za-z0-9_]+$", op):
+            formatted.append(f"/(?<![A-Za-z0-9_]){re.escape(op)}(?![A-Za-z0-9_])/")
+        else:
+            formatted.append(f'"{escape_for_lark(op)}"')
+    return " | ".join(formatted)
 
 
 def _merge_operators(
