@@ -36,7 +36,7 @@ class OperatorTable:
 
     def __init__(self) -> None:
         self._table: dict[tuple[str, str], OperatorInfo] = {}
-        self._protected_ops: set[str] = {",", ";", "->", ":-", "|", "{}"}
+        self._protected_ops: set[str] = {",", ";", "->", ":-", ":", "|", "{}"}
         self._seed_defaults()
 
     def _seed_defaults(self) -> None:
@@ -62,6 +62,7 @@ class OperatorTable:
             ("@=<", 700, "xfx"),
             ("@>", 700, "xfx"),
             ("@>=", 700, "xfx"),
+            (":", 600, "xfy"),
             ("+", 500, "yfx"),
             ("-", 500, "yfx"),
             ("*", 400, "yfx"),
