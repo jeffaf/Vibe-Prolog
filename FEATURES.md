@@ -26,7 +26,7 @@ Status legend:
 | Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
-| Custom operator syntax in source | ❌      | Parser doesn't use dynamic operators (future) |
+| Custom operator syntax in source | ✅      | Parser dynamically generates grammar for custom operators |
 | Directive prefix operator `:-` (1200, fx) | ❌ | **ISO-required** - Prefix form for directives |
 | Query prefix operator `?-` (1200, fx) | ❌ | **ISO-required** - Query prefix           |
 | DCG rule operator `-->` (1200, xfx) | ❌    | **ISO-required** - DCG syntax             |
@@ -380,7 +380,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
 | Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
-| Parsing & syntax          | ⚠️ op/3 ✅, missing ISO operators (div, ^, /\, etc.), char_conversion ❌, custom operator syntax parsing ❌ |
+| Parsing & syntax          | ⚠️ op/3 ✅, custom operator syntax parsing ✅, missing ISO operators (div, ^, /\, etc.), char_conversion ❌ |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
 | Reflection                | ⚠️ Partial                                                 |
 
@@ -392,7 +392,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
    - Arithmetic: `div`, `rem`, `^`, `**`
    - Bitwise: `/\`, `\/`, `\`, `<<`, `>>`
    - Directives: `:-` (prefix), `?-`, `-->`
-2. `op/3` must affect parsing (§6.3) - Operators declared dynamically don't affect subsequent parsing
+2. `op/3` affects parsing (§6.3) - Operators declared dynamically update the parser grammar
 3. `char_conversion/2` missing (§6.4, §7.4)
 
 ## Common Extensions Worth Implementing
