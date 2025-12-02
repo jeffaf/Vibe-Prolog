@@ -2,15 +2,14 @@
 
 import re
 from collections import defaultdict
-
-from typing import Iterable
+from dataclasses import dataclass
+from typing import Any, Iterable
 
 from lark import Lark, Transformer, v_args
 from lark.exceptions import LarkError, UnexpectedCharacters, UnexpectedToken
-from dataclasses import dataclass
-from typing import Any
 
 from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.operator_defaults import DEFAULT_OPERATORS
 from vibeprolog.terms import Atom, Variable, Number, Compound
 
 
@@ -983,41 +982,6 @@ def escape_for_lark(s: str) -> str:
 
 
 VALID_OPERATOR_SPECS = {"xfx", "xfy", "yfx", "yfy", "fx", "fy", "xf", "yf"}
-
-
-DEFAULT_OPERATORS: list[tuple[int, str, str]] = [
-    (1200, "xfx", ":-"),
-    (1100, "xfy", ";"),
-    (1050, "xfy", "->"),
-    (1000, "xfy", ","),
-    (900, "fy", "\\+"),
-    (700, "xfx", "=.."),
-    (700, "xfx", "is"),
-    (700, "xfx", "="),
-    (700, "xfx", "\\="),
-    (700, "xfx", "=:="),
-    (700, "xfx", "=\\="),
-    (700, "xfx", "<"),
-    (700, "xfx", ">"),
-    (700, "xfx", "=<"),
-    (700, "xfx", ">="),
-    (700, "xfx", "=="),
-    (700, "xfx", "\\=="),
-    (700, "xfx", "@<"),
-    (700, "xfx", "@=<"),
-    (700, "xfx", "@>"),
-    (700, "xfx", "@>="),
-    (600, "xfy", ":"),
-    (500, "yfx", "+"),
-    (500, "yfx", "-"),
-    (400, "yfx", "*"),
-    (400, "yfx", "/"),
-    (400, "yfx", "//"),
-    (400, "yfx", "mod"),
-    (200, "xfy", "**"),
-    (200, "fy", "+"),
-    (200, "fy", "-"),
-]
 
 
 def _format_operator_literals(ops: Iterable[str]) -> str:

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Iterable, Tuple
 
 from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.operator_defaults import DEFAULT_OPERATORS
 from vibeprolog.parser import List
 from vibeprolog.terms import Atom, Number, Variable
 from vibeprolog.utils.list_utils import list_to_python
@@ -41,40 +42,7 @@ class OperatorTable:
 
     def _seed_defaults(self) -> None:
         """Populate ISO-ish default operators."""
-        defaults = [
-            (";", 1100, "xfy"),
-            ("->", 1050, "xfy"),
-            (",", 1000, "xfy"),
-            ("\\+", 900, "fy"),
-            ("=..", 700, "xfx"),
-            ("is", 700, "xfx"),
-            ("=", 700, "xfx"),
-            ("\\=", 700, "xfx"),
-            ("=:=", 700, "xfx"),
-            ("=\\=", 700, "xfx"),
-            ("<", 700, "xfx"),
-            (">", 700, "xfx"),
-            ("=<", 700, "xfx"),
-            (">=", 700, "xfx"),
-            ("==", 700, "xfx"),
-            ("\\==", 700, "xfx"),
-            ("@<", 700, "xfx"),
-            ("@=<", 700, "xfx"),
-            ("@>", 700, "xfx"),
-            ("@>=", 700, "xfx"),
-            (":", 600, "xfy"),
-            ("+", 500, "yfx"),
-            ("-", 500, "yfx"),
-            ("*", 400, "yfx"),
-            ("/", 400, "yfx"),
-            ("//", 400, "yfx"),
-            ("mod", 400, "yfx"),
-            ("**", 200, "xfy"),
-            ("+", 200, "fy"),
-            ("-", 200, "fy"),
-            (":-", 1200, "xfx"),
-        ]
-        for name, precedence, spec in defaults:
+        for precedence, spec, name in DEFAULT_OPERATORS:
             self._table[(name, spec)] = OperatorInfo(precedence, spec)
 
     def clone(self) -> "OperatorTable":
