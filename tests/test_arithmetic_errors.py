@@ -100,6 +100,7 @@ class TestEvaluationErrors:
         with pytest.raises(Exception) as exc_info:
             prolog.query_once("X is 10 rem 0")
         assert "evaluation_error" in str(exc_info.value)
+        assert "zero_divisor" in str(exc_info.value)
 
     def test_sqrt_negative(self):
         """Square root of negative raises error."""
