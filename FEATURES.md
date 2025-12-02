@@ -26,7 +26,7 @@ Status legend:
 | Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
-| Custom operator syntax in source | ❌      | Parser doesn't use dynamic operators (future) |
+| Custom operator syntax in source | ✅      | Parser supports dynamically defined infix/prefix/postfix operators |
 | Directive prefix operator `:-` (1200, fx) | ❌ | **ISO-required** - Prefix form for directives |
 | Query prefix operator `?-` (1200, fx) | ❌ | **ISO-required** - Query prefix           |
 | DCG rule operator `-->` (1200, xfx) | ❌    | **ISO-required** - DCG syntax             |
