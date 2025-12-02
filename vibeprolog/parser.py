@@ -1004,8 +1004,10 @@ VALID_OPERATOR_SPECS = {"xfx", "xfy", "yfx", "yfy", "fx", "fy", "xf", "yf"}
 
 
 def _format_operator_literals(ops: Iterable[str]) -> str:
+    # Sort longest operators first so sequences like "\\+" take precedence over
+    # shorter prefixes such as "\\".
     formatted: list[str] = []
-    for op in sorted(set(ops)):
+    for op in sorted(set(ops), key=lambda value: (-len(value), value)):
         if re.match(r"^[A-Za-z0-9_]+$", op):
             formatted.append(f"/(?<![A-Za-z0-9_]){re.escape(op)}(?![A-Za-z0-9_])/")
         else:
