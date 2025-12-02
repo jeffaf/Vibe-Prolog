@@ -555,7 +555,10 @@ class AtomProcessingBuiltins:
             char_str = "".join(chars)
             # Try to interpret as number first, otherwise keep as atom
             try:
-                new_term = Number(int(char_str))
+                if '.' in char_str or 'e' in char_str.lower():
+                    new_term = Number(float(char_str))
+                else:
+                    new_term = Number(int(char_str))
             except ValueError:
                 new_term = Atom(char_str)
             new_subst = unify(term_term, new_term, subst)

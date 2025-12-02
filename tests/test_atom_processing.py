@@ -493,9 +493,9 @@ class TestName:
         result = prolog.query_once("name(a, X).")
         assert result['X'] == [97]
 
-    def test_name_atom_to_codes_multi(self):
+    def test_name_atom_to_codes_multi(self, prolog):
         """Test converting multi-character atom to codes."""
-        prolog = PrologInterpreter()
+
         result = prolog.query_once("name(hello, X).")
         assert result['X'] == [104, 101, 108, 108, 111]
 
