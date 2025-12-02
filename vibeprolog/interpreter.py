@@ -31,6 +31,8 @@ class Module:
         self.file: str | None = None
         # Import table: (functor, arity) -> source_module_name
         self.imports: dict[tuple[str, int], str] = {}
+        # Exported operators: set of (precedence, associativity, name)
+        self.exported_operators: set[tuple[int, str, str]] = set()
 
 
 class PrologInterpreter:
@@ -168,11 +170,21 @@ class PrologInterpreter:
 
             # Parse export list (should be a List AST)
             exports = set()
+            exported_operators = set()
 
             if isinstance(exports_term, ParserList):
                 for elt in exports_term.elements:
-                    # Each elt should be Name/Arity (Compound "/")
-                    if isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
+                    # Check if it's an op/3 term
+                    if isinstance(elt, Compound) and elt.functor == "op" and len(elt.args) == 3:
+                        prec_term, spec_term, name_term = elt.args
+                        # Validate operator definition
+                        precedence = self.operator_table._parse_precedence(prec_term, "module/2")
+                        spec = self.operator_table._parse_specifier(spec_term, "module/2")
+                        names = self.operator_table._parse_operator_names(name_term, "module/2")
+                        for name in names:
+                            exported_operators.add((precedence, spec, name))
+                    # Each elt should be Name/Arity (Compound "/") or op/3
+                    elif isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
                         name_arg, arity_arg = elt.args
                         if not isinstance(name_arg, Atom) or not isinstance(arity_arg, Number):
                             error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
@@ -194,6 +206,7 @@ class PrologInterpreter:
             # Create Module object and set current module context
             mod = Module(module_name, exports)
             mod.file = filepath
+            mod.exported_operators = exported_operators
             self.modules[module_name] = mod
             self.current_module = module_name
             # Reset closed predicates when entering a new module
@@ -238,8 +251,12 @@ class PrologInterpreter:
                 # Import all exported predicates
                 for pred_key in source_mod.exports:
                     current_mod.imports[pred_key] = module_name
+                # Import all exported operators (full import only)
+                for op_def in source_mod.exported_operators:
+                    precedence, spec, name = op_def
+                    self.operator_table.define(Number(precedence), Atom(spec), Atom(name), "use_module/1")
             else:
-                # Import specific predicates
+                # Import specific predicates (operators not imported in selective import)
                 for pred_key in imports:
                     if pred_key not in source_mod.exports:
                         indicator = self._indicator_from_key(pred_key)
@@ -314,6 +331,10 @@ class PrologInterpreter:
         """Resolve module file path."""
         if isinstance(file_term, Atom):
             module_name = file_term.name
+            # Check if it's an already loaded module
+            if module_name in self.modules:
+                # Return a special marker for already loaded modules
+                return f"loaded:{module_name}"
             # Direct file path
             if not Path(module_name).exists():
                 error_term = PrologError.existence_error("file", file_term, context)
@@ -342,6 +363,15 @@ class PrologInterpreter:
 
     def _load_module_from_file(self, filepath: str) -> str:
         """Load a module from file and return its name."""
+        # Handle already loaded modules
+        if filepath.startswith("loaded:"):
+            module_name = filepath[7:]  # Remove "loaded:" prefix
+            if module_name in self.modules:
+                return module_name
+            else:
+                error_term = PrologError.existence_error("module", Atom(module_name), "use_module/1,2")
+                raise PrologThrow(error_term)
+
         # Check if already loaded by checking modules
         for mod_name, mod in self.modules.items():
             if mod.file == filepath:

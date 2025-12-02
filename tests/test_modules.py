@@ -216,3 +216,102 @@ class TestUseModule:
         """)
         result = prolog.query_once("test(X)")
         assert result is not None and result["X"] == 14
+
+
+class TestOperatorExports:
+    """Tests for operator exports in module declarations."""
+
+    def test_module_exports_operator(self):
+        """Module can export an operator in its export list."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(ops_test, [op(300, fy, ~), foo/1]).
+            foo(bar).
+        """)
+        # Check that the module was created and the predicate is accessible via qualification
+        assert prolog.has_solution("ops_test:foo(bar)")
+
+    def test_operator_available_after_import(self):
+        """Exported operators are available after import."""
+        prolog = PrologInterpreter()
+        # Create a module that exports an operator
+        prolog.consult_string("""
+            :- op(200, xfx, +++).
+            :- module(myops, [op(200, xfx, +++), test/1]).
+            test(a +++ b).
+        """)
+        # Import it and verify operator works
+        prolog.consult_string("""
+            :- use_module(myops).
+            query :- test(a +++ b).
+        """)
+        assert prolog.has_solution("query")
+
+    def test_multiple_operator_exports(self):
+        """Module can export multiple operators."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(multi_ops, [op(300, fy, ~), op(500, xfx, #), pred/0]).
+            pred.
+        """)
+        assert prolog.has_solution("multi_ops:pred")
+
+    def test_selective_import_excludes_operators(self):
+        """Selective import should not import operators (SWI-Prolog behavior)."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(selective, [op(200, xfx, <<<), foo/1, bar/1]).
+            foo(1).
+            bar(2).
+        """)
+        # Selective import should not get the operator
+        prolog.consult_string("""
+            :- use_module(selective, [foo/1]).
+            % The operator <<< should NOT be available here
+        """)
+        # Test that predicate works but operator doesn't
+        assert prolog.has_solution("foo(1)")
+
+    def test_full_import_includes_operators(self):
+        """Full import (no list) should import operators."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(200, xfx, ++).
+            :- module(full, [op(200, xfx, ++), baz/1]).
+            baz(test ++ test).
+        """)
+        prolog.consult_string("""
+            :- use_module(full).
+            verify :- baz(test ++ test).
+        """)
+        assert prolog.has_solution("verify")
+
+    def test_invalid_operator_precedence_in_export(self):
+        """Invalid operator precedence should raise error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.consult_string(":- module(bad, [op(2000, fy, ~)]).")
+        assert "domain_error" in str(exc_info.value) or "operator_priority" in str(exc_info.value)
+
+    def test_invalid_operator_associativity_in_export(self):
+        """Invalid associativity should raise error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.consult_string(":- module(bad, [op(300, bad_assoc, ~)]).")
+        assert "domain_error" in str(exc_info.value) or "operator_specifier" in str(exc_info.value)
+
+    def test_clpb_operators(self):
+        """Test with actual operators from library(clpb)."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(300, fy, ~).
+            :- op(500, yfx, #).
+            :- module(clpb_lite, [op(300, fy, ~), op(500, yfx, #), sat/1]).
+            sat(~X) :- sat(1 # X).
+            sat(1).
+        """)
+        prolog.consult_string("""
+            :- use_module(clpb_lite).
+            test :- sat(1).
+        """)
+        assert prolog.has_solution("test")

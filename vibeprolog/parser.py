@@ -934,7 +934,7 @@ def _parse_operator_name_list(raw: str) -> list[str]:
 
 
 def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
-    """Extract op/3 directives from source code.
+    """Extract op/3 directives from source code, including operators in module export lists.
 
     Args:
         source: Prolog source code string
@@ -945,23 +945,46 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
 
     operators: list[tuple[int, str, str]] = []
     directive_pattern = re.compile(r"^\s*:-\s*op\s*\((.*)\)\s*\.$", re.DOTALL)
+    module_pattern = re.compile(r"^\s*:-\s*module\s*\(\s*([^,]+)\s*,\s*\[(.*)\]\s*\)\s*\.$", re.DOTALL)
 
     for statement in tokenize_prolog_statements(source):
+        # Check for op/3 directives
         match = directive_pattern.match(statement.strip())
-        if not match:
+        if match:
+            contents = match.group(1)
+            args = _split_top_level_commas(contents)
+            if len(args) != 3:
+                continue
+            try:
+                precedence = int(args[0].strip())
+            except ValueError:
+                continue
+            op_type = _strip_quotes(args[1].strip())
+            operator_names = _parse_operator_name_list(args[2].strip())
+            for op_name in operator_names:
+                operators.append((precedence, op_type, op_name))
             continue
-        contents = match.group(1)
-        args = _split_top_level_commas(contents)
-        if len(args) != 3:
-            continue
-        try:
-            precedence = int(args[0].strip())
-        except ValueError:
-            continue
-        op_type = _strip_quotes(args[1].strip())
-        operator_names = _parse_operator_name_list(args[2].strip())
-        for op_name in operator_names:
-            operators.append((precedence, op_type, op_name))
+
+        # Check for module/2 with op/3 in export list
+        match = module_pattern.match(statement.strip())
+        if match:
+            exports_str = match.group(2)
+            export_items = _split_top_level_commas(exports_str)
+            for item in export_items:
+                item = item.strip()
+                if item.startswith("op(") and item.endswith(")"):
+                    # Extract op arguments
+                    op_content = item[3:-1]  # Remove "op(" and ")"
+                    args = _split_top_level_commas(op_content)
+                    if len(args) == 3:
+                        try:
+                            precedence = int(args[0].strip())
+                        except ValueError:
+                            continue
+                        op_type = _strip_quotes(args[1].strip())
+                        operator_names = _parse_operator_name_list(args[2].strip())
+                        for op_name in operator_names:
+                            operators.append((precedence, op_type, op_name))
 
     return operators
 
