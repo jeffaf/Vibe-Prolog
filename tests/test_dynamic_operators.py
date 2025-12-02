@@ -8,8 +8,8 @@ import pytest
 from vibeprolog import PrologInterpreter
 from vibeprolog.exceptions import PrologThrow
 from vibeprolog.operators import OperatorTable
-from vibeprolog.parser import extract_op_directives, generate_operator_rules, _merge_operators, _parse_operator_name_list
-from vibeprolog.terms import Atom, Compound
+from vibeprolog.parser import extract_op_directives, generate_operator_rules, _merge_operators, _parse_operator_name_list, List
+from vibeprolog.terms import Atom, Compound, Number, Variable
 
 
 class TestOperatorDefinition:
@@ -689,7 +689,6 @@ class TestOperatorTableParsing:
     def test_parse_precedence_valid(self):
         """Parse valid precedence values."""
         table = OperatorTable()
-        from vibeprolog.terms import Number
         assert table._parse_precedence(Number(500), 'test') == 500
         assert table._parse_precedence(Number(0), 'test') == 0
         assert table._parse_precedence(Number(1200), 'test') == 1200
@@ -697,7 +696,6 @@ class TestOperatorTableParsing:
     def test_parse_precedence_variable_error(self):
         """Unbound precedence raises instantiation_error."""
         table = OperatorTable()
-        from vibeprolog.terms import Variable
         with pytest.raises(PrologThrow):
             table._parse_precedence(Variable('X'), 'test')
 
@@ -731,7 +729,6 @@ class TestOperatorTableParsing:
     def test_parse_specifier_variable_error(self):
         """Unbound specifier raises instantiation_error."""
         table = OperatorTable()
-        from vibeprolog.terms import Variable
         with pytest.raises(PrologThrow):
             table._parse_specifier(Variable('T'), 'test')
 
@@ -755,7 +752,6 @@ class TestOperatorTableParsing:
     def test_parse_operator_names_list(self):
         """Parse list of operator names."""
         table = OperatorTable()
-        from vibeprolog.parser import List
         # Create a list [@@, @@@@]
         names_list = List(elements=(Atom('@@'), Atom('@@@@')))
         assert table._parse_operator_names(names_list, 'test') == ['@@', '@@@@']
@@ -763,15 +759,12 @@ class TestOperatorTableParsing:
     def test_parse_operator_names_variable_error(self):
         """Unbound operator name raises instantiation_error."""
         table = OperatorTable()
-        from vibeprolog.terms import Variable
         with pytest.raises(PrologThrow):
             table._parse_operator_names(Variable('Op'), 'test')
 
     def test_parse_operator_names_non_atom_in_list_error(self):
         """Non-atom in operator list raises type_error."""
         table = OperatorTable()
-        from vibeprolog.parser import List
-        from vibeprolog.terms import Number
         # Create a list [@@, 500] where 500 is a number, not atom
         names_list = List(elements=(Atom('@@'), Number(500)))
         with pytest.raises(PrologThrow):
@@ -890,11 +883,11 @@ class TestOperatorIntegration:
             prolog.consult_string("test2(a custom b).")
 
 
-class TestDynamicOperatorParsing:
-    """Test that custom operator parsing is now fully supported.
+class TestCustomOperatorParsing:
+    """Tests for parsing custom operator syntax in source code.
 
-    These tests verify that infix, prefix, and postfix operators
-    are parsed correctly from source code.
+    These tests verify that custom operators defined with op/3 are correctly
+    parsed in various contexts, respecting precedence and associativity.
     """
 
     def test_infix_operator_parsing_supported(self):
@@ -940,12 +933,14 @@ class TestDynamicOperatorParsing:
             :- op(400, xfx, '+++').
             :- op(500, xfx, '***').
 
-            test(X) :- X = (a +++ b *** c).
+            test(X) :- X = a +++ b *** c.
         """)
-
         result = prolog.query_once("test(X)")
-        # a +++ (b *** c) because *** has higher precedence (500 > 400)
+        # '+++' (400) has higher precedence than '***' (500), so it binds tighter.
+        # The expression should parse as (a +++ b) *** c.
         assert result is not None
+        expected = {'*': [{'*': [{'+++': ['a', 'b']}, '*']}, 'c']}
+        assert result['X'] == expected
 
 
 if __name__ == '__main__':
