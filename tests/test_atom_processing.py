@@ -483,10 +483,13 @@ class TestNumberCodes:
 
 class TestName:
     """Tests for name/2 predicate (classic Prolog compatibility)."""
+    @pytest.fixture
+    def prolog(self):
+        """Provides a PrologInterpreter instance for tests."""
+        return PrologInterpreter()
 
-    def test_name_atom_to_codes_simple(self):
-        """Test converting single-character atom to codes."""
-        prolog = PrologInterpreter()
+    def test_name_atom_to_codes_simple(self, prolog):
+        """Test converting single-character atom to codes using fixture-provided interpreter."""
         result = prolog.query_once("name(a, X).")
         assert result['X'] == [97]
 

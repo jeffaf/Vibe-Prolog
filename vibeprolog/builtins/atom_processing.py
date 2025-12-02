@@ -527,11 +527,8 @@ class AtomProcessingBuiltins:
 
         # Mode 1: term to codes (atom or number)
         if isinstance(term_term, (Atom, Number)):
-            if isinstance(term_term, Atom):
-                codes = [Number(ord(c)) for c in term_term.name]
-            else:  # Number
-                num_str = str(term_term.value)
-                codes = [Number(ord(c)) for c in num_str]
+            text_representation = term_term.name if isinstance(term_term, Atom) else str(term_term.value)
+            codes = [Number(ord(c)) for c in text_representation]
             code_list = List(tuple(codes), None)
             new_subst = unify(codes_term, code_list, subst)
             if new_subst is not None:
@@ -544,34 +541,26 @@ class AtomProcessingBuiltins:
             if elements is None:
                 return  # Not a proper list
 
-            char_str = ""
+            chars = []
             for elem in elements:
                 elem = deref(elem, subst)
                 if not isinstance(elem, Number) or not isinstance(elem.value, int):
                     error_term = PrologError.type_error("integer", elem, "name/2")
                     raise PrologThrow(error_term)
                 try:
-                    char_str += chr(elem.value)
+                    chars.append(chr(elem.value))
                 except ValueError:
                     error_term = PrologError.type_error("character_code", elem, "name/2")
                     raise PrologThrow(error_term)
-
-            # Try to parse as number first
+            char_str = "".join(chars)
+            # Try to interpret as number first, otherwise keep as atom
             try:
-                if '.' in char_str or 'e' in char_str.lower():
-                    result = float(char_str)
-                else:
-                    result = int(char_str)
-                result_number = Number(result)
-                new_subst = unify(term_term, result_number, subst)
-                if new_subst is not None:
-                    yield new_subst
+                new_term = Number(int(char_str))
             except ValueError:
-                # If number parsing fails, create an atom
-                result_atom = Atom(char_str)
-                new_subst = unify(term_term, result_atom, subst)
-                if new_subst is not None:
-                    yield new_subst
+                new_term = Atom(char_str)
+            new_subst = unify(term_term, new_term, subst)
+            if new_subst is not None:
+                yield new_subst
 
 
 __all__ = ["AtomProcessingBuiltins"]
