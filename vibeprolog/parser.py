@@ -617,12 +617,11 @@ class PrologTransformer(Transformer):
             return Number(int(value))
 
     def negative_number(self, items):
-        # items may contain only the numeric token since the leading "-" is a
-        # literal in the grammar; guard against short lists to avoid crashes.
+        # The grammar rule `primary: "-" number -> negative_number` ensures
+        # that the number has already been transformed into a Number object.
         num = items[-1]
-        if isinstance(num, Number):
-            return Number(-num.value)
-        return Compound("-", (self.number([f"-{num}"]),))
+        assert isinstance(num, Number), f"Expected Number, got {type(num).__name__}"
+        return Number(-num.value)
 
     def _parse_base_number(self, value):
         """Parse base'digits syntax like 16'ff or -2'abcd."""
