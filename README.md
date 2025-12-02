@@ -67,3 +67,7 @@ YES!
 Please send in your vibe contributions! Just open a PR.
 
 Are you a tool vendor who wants your tools used? Yes! I'd love to use them. I prefer a PR but opening an Issue also works
+
+# Libraries and Examples
+
+The libraries in ./library and the examples in ./example are **NOT* AI generated!
