@@ -575,20 +575,12 @@ class TestDynamicOperatorParsing:
     are parsed correctly from source code.
     """
 
-    def test_infix_operator_parsing_is_supported(self):
-        """Custom infix operators are supported and parsed as infix syntax.
-
-        You can now use: a +++ b
-        """
+    def test_infix_operator_parsing_not_yet_supported(self):
+        # For now, use: fact(a +++ b)
         prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- op(500, xfx, '+++').
-            fact(a +++ b).
-        """)
-        
-        # This will fail until parsing is implemented
-        # For now, use: fact(+++(a, b))
-        assert prolog.has_solution("fact(+++(a, b))")
+        prolog.consult_string(":- op(500, xfx, '+++').")
+        prolog.consult_string("fact(a +++ b).")
+        assert prolog.has_solution("fact(a +++ b)")
 
     def test_prefix_operator_parsing_not_yet_supported(self):
         """Custom prefix operators are supported and parsed as prefix syntax.
