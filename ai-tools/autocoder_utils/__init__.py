@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -96,3 +97,48 @@ def get_owner_repo(remote: str = "origin") -> tuple[str, str]:
         raise SystemExit(f"Unrecognised owner/repo in URL: {url!r}")
 
     return owner, repo
+
+
+def get_repo_labels() -> set[str]:
+    """Get all labels that exist in the repository.
+
+    Returns:
+        Set of label names that exist in the repo
+    """
+    try:
+        json_output = run(["gh", "label", "list", "--json", "name", "--limit", "1000"])
+        data = json.loads(json_output)
+        if isinstance(data, list):
+            return {item["name"] for item in data if isinstance(item, dict) and "name" in item}
+    except (json.JSONDecodeError, SystemExit) as e:
+        print(f"Warning: Could not retrieve repository labels: {e}", file=sys.stderr)
+    return set()
+
+
+def add_label_if_needed(item_type: str, item_number: str, label: str = "nac") -> None:
+    """Add a label to an issue or PR if it doesn't already have it.
+
+    Args:
+        item_type: Either "issue" or "pr"
+        item_number: The issue or PR number
+        label: The label to add (default: "nac")
+    """
+    # First check if the label exists in the repository
+    repo_labels = get_repo_labels()
+    if label not in repo_labels:
+        return  # Label doesn't exist in repo, skip
+
+    # Check if the item already has this label
+    try:
+        json_output = run(["gh", item_type, "view", item_number, "--json", "labels"])
+        data = json.loads(json_output)
+        labels = data.get("labels", [])
+        existing_labels = {lbl["name"] for lbl in labels if isinstance(lbl, dict) and "name" in lbl}
+
+        if label in existing_labels:
+            return  # Label already exists on the item
+
+        # Add the label
+        run(["gh", item_type, "edit", item_number, "--add-label", label], capture_output=False)
+    except (json.JSONDecodeError, SystemExit) as e:
+        print(f"Warning: Failed to add label '{label}' to {item_type} #{item_number}: {e}", file=sys.stderr)
