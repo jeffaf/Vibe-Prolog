@@ -165,7 +165,7 @@ __OPERATOR_GRAMMAR__
     CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'\\])/ | /\d+'.'/
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
-    SPECIAL_ATOM: /'([^'\\]|\\.)+'/ 
+    SPECIAL_ATOM: /'([^'\\]|\\.)+'/
 
     // Special atom operators must have HIGHEST priority to prevent being parsed as prefix operators
     SPECIAL_ATOM_OPS.12: /-\$/ | /\$-/
