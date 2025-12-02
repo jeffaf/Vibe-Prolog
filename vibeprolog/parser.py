@@ -902,9 +902,9 @@ def _split_top_level_commas(text: str) -> list[str]:
             current.append(ch)
             continue
 
-        if ch in "([" and not in_single and not in_double:
+        if ch in "([{" and not in_single and not in_double:
             depth += 1
-        elif ch in ")]" and not in_single and not in_double and depth > 0:
+        elif ch in ")]}" and not in_single and not in_double and depth > 0:
             depth -= 1
 
         if ch == "," and not in_single and not in_double and depth == 0:
