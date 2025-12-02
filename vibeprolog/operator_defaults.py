@@ -38,11 +38,10 @@ DEFAULT_OPERATORS: list[tuple[int, str, str]] = [
     (400, "yfx", "div"),
     (400, "yfx", "<<"),
     (400, "yfx", ">>"),
-    (200, "xfx", "**"),
+    (200, "xfy", "**"),
     (200, "xfy", "^"),
     (200, "fy", "+"),
     (200, "fy", "-"),
-    (200, "fy", "\\"),
 ]
 
 __all__ = ["DEFAULT_OPERATORS"]
