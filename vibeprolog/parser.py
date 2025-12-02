@@ -947,22 +947,25 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
     directive_pattern = re.compile(r"^\s*:-\s*op\s*\((.*)\)\s*\.$", re.DOTALL)
     module_pattern = re.compile(r"^\s*:-\s*module\s*\(\s*([^,]+)\s*,\s*\[(.*)\]\s*\)\s*\.$", re.DOTALL)
 
+    def _try_parse_op(op_args_str: str):
+        """Helper to parse op/3 arguments and add to operators list."""
+        args = _split_top_level_commas(op_args_str)
+        if len(args) != 3:
+            return
+        try:
+            precedence = int(args[0].strip())
+        except ValueError:
+            return
+        op_type = _strip_quotes(args[1].strip())
+        operator_names = _parse_operator_name_list(args[2].strip())
+        for op_name in operator_names:
+            operators.append((precedence, op_type, op_name))
+
     for statement in tokenize_prolog_statements(source):
         # Check for op/3 directives
         match = directive_pattern.match(statement.strip())
         if match:
-            contents = match.group(1)
-            args = _split_top_level_commas(contents)
-            if len(args) != 3:
-                continue
-            try:
-                precedence = int(args[0].strip())
-            except ValueError:
-                continue
-            op_type = _strip_quotes(args[1].strip())
-            operator_names = _parse_operator_name_list(args[2].strip())
-            for op_name in operator_names:
-                operators.append((precedence, op_type, op_name))
+            _try_parse_op(match.group(1))
             continue
 
         # Check for module/2 with op/3 in export list
@@ -973,18 +976,8 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
             for item in export_items:
                 item = item.strip()
                 if item.startswith("op(") and item.endswith(")"):
-                    # Extract op arguments
                     op_content = item[3:-1]  # Remove "op(" and ")"
-                    args = _split_top_level_commas(op_content)
-                    if len(args) == 3:
-                        try:
-                            precedence = int(args[0].strip())
-                        except ValueError:
-                            continue
-                        op_type = _strip_quotes(args[1].strip())
-                        operator_names = _parse_operator_name_list(args[2].strip())
-                        for op_name in operator_names:
-                            operators.append((precedence, op_type, op_name))
+                    _try_parse_op(op_content)
 
     return operators
 
