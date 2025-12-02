@@ -865,9 +865,11 @@ class TestOperatorIntegration:
         """)
 
         # Should parse as a >< (b ++ (c ^^ d)) due to precedence
-        assert prolog.has_solution("expr(_)")
         result = prolog.query_once("expr(X)")
         assert result is not None
+        # Check the parsed structure based on precedence
+        expected = {'><': ['a', {'++': ['b', {'^^': ['c', 'd']}]}]}
+        assert result['X'] == expected
 
     def test_operator_removal_via_zero_precedence(self):
         """op(0, _, Op) removes operator and affects parsing."""
