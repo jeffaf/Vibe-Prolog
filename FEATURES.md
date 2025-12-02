@@ -355,7 +355,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Export enforcement                | ✅      |                                                                |
 | Built-ins visible in all modules  | ✅      |                                                                |
 | Clause body module resolution     | ✅      | Unqualified goals resolve via imports → defining module → user |
-| `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)` |
+| `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)`; library/ preferred over examples/modules/ for module resolution |
 | **Operator exports in module/2**  | ✅      | **SWI-Prolog compatible - operators can be exported**          |
 | Cross-module dynamic semantics    | ⚠️     | Implemented; further test coverage recommended                 |
 
