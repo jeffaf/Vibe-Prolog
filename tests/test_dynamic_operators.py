@@ -568,14 +568,14 @@ class TestOperatorEdgeCases:
             assert result is not None, f"Failed for {op_type}"
 
 
-class TestOperatorLimitations:
+class TestDynamicOperatorParsing:
     """Test that custom operator parsing is now fully supported.
 
     These tests verify that infix, prefix, and postfix operators
     are parsed correctly from source code.
     """
 
-    def test_infix_operator_parsing_not_yet_supported(self):
+    def test_infix_operator_parsing_is_supported(self):
         """Custom infix operators are supported and parsed as infix syntax.
 
         You can now use: a +++ b
