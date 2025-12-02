@@ -381,6 +381,13 @@ class PrologTransformer(Transformer):
 
     def _apply_prefix_operator(self, op, term):
         op_str = str(op)
+        if op_str == "-":
+            if isinstance(term, Number):
+                return Number(-term.value)
+            if isinstance(term, Compound) and term.functor == "-" and len(term.args) == 1:
+                inner = term.args[0]
+                if isinstance(inner, Number):
+                    return Number(-inner.value)
         return Compound(op_str, (term,))
 
     def module_term(self, items):
@@ -615,7 +622,7 @@ class PrologTransformer(Transformer):
         # literal in the grammar; guard against short lists to avoid crashes.
         num = items[-1]
         if isinstance(num, Number):
-            return Compound("-", (num,))
+            return Number(-num.value)
         return Compound("-", (self.number([f"-{num}"]),))
 
     def _parse_base_number(self, value):
@@ -1409,7 +1416,7 @@ class PrologParser:
             self._ensure_parser(cleaned_text)
             tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
-            parsed_items = transformer.transform(tree)
+            parsed_items = [self._fold_numeric_unary_minus(item) for item in transformer.transform(tree)]
             # Associate PlDoc comments with items
             self._associate_pldoc_comments(parsed_items, pldoc_comments)
             return parsed_items
@@ -1437,6 +1444,33 @@ class PrologParser:
             # Unterminated comment
             error_term = PrologError.syntax_error(str(e), context)
             raise PrologThrow(error_term)
+
+    def _fold_numeric_unary_minus(self, term):
+        """Normalize unary minus applications to numeric literals."""
+
+        if isinstance(term, Clause):
+            head = self._fold_numeric_unary_minus(term.head)
+            body = None
+            if term.body is not None:
+                body = [self._fold_numeric_unary_minus(goal) for goal in term.body]
+            return Clause(head, body, term.doc, term.meta, term.dcg)
+
+        if isinstance(term, Directive):
+            goal = self._fold_numeric_unary_minus(term.goal)
+            return Directive(goal, term.doc, term.meta)
+
+        if isinstance(term, List):
+            elements = tuple(self._fold_numeric_unary_minus(e) for e in term.elements)
+            tail = None if term.tail is None else self._fold_numeric_unary_minus(term.tail)
+            return List(elements, tail)
+
+        if isinstance(term, Compound):
+            args = tuple(self._fold_numeric_unary_minus(arg) for arg in term.args)
+            if term.functor == "-" and len(args) == 1 and isinstance(args[0], Number):
+                return Number(-args[0].value)
+            return Compound(term.functor, args)
+
+        return term
 
     def parse_term(
         self,
