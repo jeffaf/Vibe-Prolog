@@ -152,7 +152,7 @@ Status legend:
 | --------------------------------- | ------ | ------------------------------------- |
 | `is/2`                            | ✅      |                                       |
 | Arithmetic comparison operators   | ✅      |                                       |
-| Arithmetic evaluation: `+/2`, `-/2`, `*/2`, `//2`, `mod/2` | ✅ | **ISO-required** - Used within `is/2` |
+| Arithmetic evaluation: `+/2`, `-/2`, `*/2`, `//2`, `///2`, `mod/2`, `div/2` | ✅      | **ISO-required** - Used within `is/2` |
 | Integer division: `div/2`         | ❌      | **ISO-required** - Missing operator   |
 | Unary operators: `-/1`, `+/1`     | ✅      | **ISO-required** - Negation and plus  |
 | Power operators: `^/2`, `**/2`    | ❌      | **ISO-required** - Exponentiation     |
