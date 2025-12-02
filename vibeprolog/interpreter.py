@@ -18,6 +18,7 @@ from vibeprolog.parser import (
     PredicatePropertyDirective,
     PrologParser,
     extract_op_directives,
+    tokenize_prolog_statements,
 )
 from vibeprolog.operators import OperatorTable
 from vibeprolog.terms import Atom, Compound, Number, Variable
@@ -57,6 +58,8 @@ class PrologInterpreter:
         self.predicate_docs: dict[tuple[str, int], str] = {}
         self._consult_counter = 0
         self._builtins_seeded = False
+        self._import_operator_cache: dict[str, list[tuple[int, str, str]]] = {}
+        self._current_source_path: Path | None = None
 
     @property
     def argv(self) -> list[str]:
@@ -229,8 +232,11 @@ class PrologInterpreter:
                 error_term = PrologError.type_error("callable", goal, "use_module/1,2")
                 raise PrologThrow(error_term)
 
+            base_dir = self._current_source_path.parent if self._current_source_path else None
             # Resolve the module file
-            module_file = self._resolve_module_file(file_term, "use_module/1,2")
+            module_file = self._resolve_module_file(
+                file_term, "use_module/1,2", base_path=base_dir
+            )
 
             # Load the module if not already loaded
             module_name = self._load_module_from_file(module_file)
@@ -329,7 +335,7 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
         return imports
 
-    def _resolve_module_file(self, file_term, context: str) -> str:
+    def _resolve_module_file(self, file_term, context: str, base_path: Path | None = None) -> str:
         """Resolve module file path."""
         if isinstance(file_term, Atom):
             module_name = file_term.name
@@ -338,10 +344,15 @@ class PrologInterpreter:
                 # Return a special marker for already loaded modules
                 return f"loaded:{module_name}"
             # Direct file path
-            if not Path(module_name).exists():
+            direct_path = Path(module_name)
+            if not direct_path.is_absolute() and base_path is not None:
+                candidate = base_path / direct_path
+                if candidate.exists():
+                    return str(candidate)
+            if not direct_path.exists():
                 error_term = PrologError.existence_error("file", file_term, context)
                 raise PrologThrow(error_term)
-            return module_name
+            return str(direct_path)
         elif isinstance(file_term, Compound) and file_term.functor == "library" and len(file_term.args) == 1:
             # library(Name) syntax
             lib_term = file_term.args[0]
@@ -351,17 +362,139 @@ class PrologInterpreter:
             lib_name = lib_term.name
             # Look in library/ first, then examples/modules/
             candidates = [
-                f"library/{lib_name}.pl",
-                f"examples/modules/{lib_name}.pl"
+                Path(f"library/{lib_name}.pl"),
+                Path(f"examples/modules/{lib_name}.pl")
             ]
             for candidate in candidates:
-                if Path(candidate).exists():
-                    return candidate
+                candidate_path = candidate
+                if base_path is not None and not candidate.is_absolute():
+                    candidate_path = base_path / candidate
+                if candidate_path.exists():
+                    return str(candidate_path)
             error_term = PrologError.existence_error("file", file_term, context)
             raise PrologThrow(error_term)
         else:
             error_term = PrologError.type_error("atom", file_term, context)
             raise PrologThrow(error_term)
+
+    def _source_path_from_name(self, source_name: str) -> Path | None:
+        if source_name.startswith("file:"):
+            raw_path = source_name[5:]
+            if "#" in raw_path:
+                raw_path = raw_path.split("#", maxsplit=1)[0]
+            return Path(raw_path)
+        return None
+
+    def _extract_import_terms(
+        self, prolog_code: str, directive_ops: list[tuple[int, str, str]]
+    ) -> list:
+        imports: list = []
+        temp_parser = PrologParser(OperatorTable())
+        for chunk in tokenize_prolog_statements(prolog_code):
+            stripped = chunk.strip()
+            if not stripped.startswith(":-"):
+                continue
+            try:
+                directives = temp_parser.parse(
+                    stripped,
+                    "import_scan",
+                    apply_char_conversions=False,
+                    directive_ops=directive_ops,
+                )
+            except (ValueError, LarkError):
+                # If we cannot parse the directive with default operators, skip it
+                continue
+            for item in directives:
+                if not isinstance(item, Directive):
+                    continue
+                goal = item.goal
+                if not isinstance(goal, Compound):
+                    continue
+                if goal.functor in {"use_module", "ensure_loaded", "consult"}:
+                    if len(goal.args) == 1:
+                        imports.append(goal.args[0])
+                    elif goal.functor == "use_module" and len(goal.args) == 2:
+                        imports.append(goal.args[0])
+        return imports
+
+    def _collect_module_operators_from_file(
+        self, filepath: Path, visited: set[str]
+    ) -> list[tuple[int, str, str]]:
+        resolved_path = str(filepath.resolve())
+        if resolved_path in self._import_operator_cache:
+            return list(self._import_operator_cache[resolved_path])
+        if resolved_path in visited:
+            return []
+
+        visited.add(resolved_path)
+        with open(filepath, "r") as handle:
+            module_source = handle.read()
+
+        try:
+            local_ops = extract_op_directives(module_source)
+        except ValueError as exc:
+            visited.remove(resolved_path)
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
+        imports = self._extract_import_terms(module_source, local_ops)
+
+        collected_ops: list[tuple[int, str, str]] = []
+        for import_term in imports:
+            try:
+                resolved_import = self._resolve_module_file(
+                    import_term, "use_module/1,2", base_path=filepath.parent
+                )
+            except PrologThrow:
+                continue
+
+            if resolved_import.startswith("loaded:"):
+                loaded_name = resolved_import[7:]
+                loaded_module = self.modules.get(loaded_name)
+                if loaded_module is None or loaded_module.file is None:
+                    continue
+                resolved_import = loaded_module.file
+
+            collected_ops.extend(
+                self._collect_module_operators_from_file(Path(resolved_import), visited)
+            )
+
+        collected_ops.extend(local_ops)
+        self._import_operator_cache[resolved_path] = list(collected_ops)
+        visited.remove(resolved_path)
+        return collected_ops
+
+    def _collect_imported_operators(
+        self,
+        prolog_code: str,
+        source_name: str,
+        local_directives: list[tuple[int, str, str]],
+    ) -> list[tuple[int, str, str]]:
+        base_path = self._source_path_from_name(source_name)
+        visited: set[str] = set()
+        collected_ops: list[tuple[int, str, str]] = []
+
+        import_terms = self._extract_import_terms(prolog_code, local_directives)
+        for import_term in import_terms:
+            try:
+                resolved_import = self._resolve_module_file(
+                    import_term, "use_module/1,2", base_path=base_path
+                )
+            except PrologThrow:
+                # Defer existence/type errors to the real consult phase
+                continue
+
+            if resolved_import.startswith("loaded:"):
+                loaded_name = resolved_import[7:]
+                loaded_module = self.modules.get(loaded_name)
+                if loaded_module is None or loaded_module.file is None:
+                    continue
+                resolved_import = loaded_module.file
+
+            collected_ops.extend(
+                self._collect_module_operators_from_file(Path(resolved_import), visited)
+            )
+
+        return collected_ops
 
     def _load_module_from_file(self, filepath: str) -> str:
         """Load a module from file and return its name."""
@@ -562,9 +695,14 @@ class PrologInterpreter:
         self.current_module = "user"
         # Ensure a default user module exists
         self.modules.setdefault("user", Module("user", None))
+        self._current_source_path = self._source_path_from_name(source_name)
 
         try:
-            directive_ops = extract_op_directives(prolog_code)
+            local_directives = extract_op_directives(prolog_code)
+            imported_ops = self._collect_imported_operators(
+                prolog_code, source_name, local_directives
+            )
+            directive_ops = imported_ops + local_directives
         except ValueError as exc:
             error_term = PrologError.syntax_error(str(exc), "consult/1")
             raise PrologThrow(error_term)
@@ -616,6 +754,7 @@ class PrologInterpreter:
         # Expose interpreter to engine for module-aware resolution
         self.engine.interpreter = self
         self._execute_initialization_goals()
+        self._current_source_path = None
 
     def _split_clauses(self, prolog_code: str) -> list[str]:
         """Split Prolog code into individual clause/directive strings.
