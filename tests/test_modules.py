@@ -218,6 +218,29 @@ class TestUseModule:
         result = prolog.query_once("test(X)")
         assert result is not None and result["X"] == 14
 
+    def test_library_preferred_over_examples(self):
+        """Test that library/ is preferred over examples/modules/ for module resolution."""
+        prolog = PrologInterpreter()
+        # Use test_module which exists in both library/ and examples/modules/
+        # library/test_module.pl defines test_pred(library_version)
+        prolog.consult_string("""
+            :- use_module(library(test_module)).
+            test_version(X) :- test_pred(X).
+        """)
+        result = prolog.query_once("test_version(X)")
+        assert result is not None and result["X"] == "library_version"
+
+    def test_examples_fallback_when_library_missing(self):
+        """Test that examples/modules/ is used when library/ doesn't exist."""
+        prolog = PrologInterpreter()
+        # Use math_utils which only exists in examples/modules/
+        prolog.consult_string("""
+            :- use_module(library(math_utils)).
+            test_double(X) :- double(5, X).
+        """)
+        result = prolog.query_once("test_double(X)")
+        assert result is not None and result["X"] == 10
+
 
 class TestOperatorExports:
     """Tests for operator exports in module declarations."""

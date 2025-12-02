@@ -349,10 +349,10 @@ class PrologInterpreter:
                 error_term = PrologError.type_error("atom", lib_term, context)
                 raise PrologThrow(error_term)
             lib_name = lib_term.name
-            # Look in examples/modules/ first, then library/
+            # Look in library/ first, then examples/modules/
             candidates = [
-                f"examples/modules/{lib_name}.pl",
-                f"library/{lib_name}.pl"
+                f"library/{lib_name}.pl",
+                f"examples/modules/{lib_name}.pl"
             ]
             for candidate in candidates:
                 if Path(candidate).exists():
