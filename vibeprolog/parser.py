@@ -865,11 +865,12 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
 
 
 def _strip_quotes(token: str) -> str:
-    if (token.startswith("'") and token.endswith("'")) or (
-        token.startswith("\"") and token.endswith("\"")
-    ):
+    if token.startswith("'") and token.endswith("'"):
         inner = token[1:-1]
         return inner.replace("''", "'")
+    elif token.startswith('"') and token.endswith('"'):
+        inner = token[1:-1]
+        return inner.replace('\\"', '"').replace('\\\\', '\\')
     return token
 
 
