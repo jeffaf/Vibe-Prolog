@@ -890,15 +890,15 @@ class TestOperatorIntegration:
             prolog.consult_string("test2(a custom b).")
 
 
-class TestOperatorLimitations:
-    """Document current limitations of operator implementation.
+class TestDynamicOperatorParsing:
+    """Test that custom operator parsing is now fully supported.
 
-    These tests demonstrate what is NOT yet supported.
-    They are marked as xfail to indicate expected limitations.
+    These tests verify that infix, prefix, and postfix operators
+    are parsed correctly from source code.
     """
 
     def test_infix_operator_parsing_supported(self):
-        """Custom infix operators are now parsed as infix syntax."""
+        """Custom infix operators are parsed as infix syntax."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
             :- op(500, xfx, '+++').
@@ -910,7 +910,7 @@ class TestOperatorLimitations:
         assert result is not None
 
     def test_prefix_operator_parsing_supported(self):
-        """Custom prefix operators are now parsed as prefix syntax."""
+        """Custom prefix operators are parsed as prefix syntax."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
             :- op(300, fy, '~~').
@@ -922,7 +922,7 @@ class TestOperatorLimitations:
         assert result is not None
 
     def test_postfix_operator_parsing_supported(self):
-        """Custom postfix operators are now parsed as postfix syntax."""
+        """Custom postfix operators are parsed as postfix syntax."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
             :- op(200, xf, '!!').

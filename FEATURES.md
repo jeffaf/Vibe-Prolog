@@ -26,7 +26,7 @@ Status legend:
 | Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
-| Custom operator syntax in source | ✅      | Parser dynamically generates grammar for custom operators |
+| Custom operator syntax in source | ✅      | Parser dynamically generates grammar for custom operators (infix/prefix/postfix) |
 | Directive prefix operator `:-` (1200, fx) | ❌ | **ISO-required** - Prefix form for directives |
 | Query prefix operator `?-` (1200, fx) | ❌ | **ISO-required** - Query prefix           |
 | DCG rule operator `-->` (1200, xfx) | ❌    | **ISO-required** - DCG syntax             |
@@ -152,7 +152,7 @@ Status legend:
 | --------------------------------- | ------ | ------------------------------------- |
 | `is/2`                            | ✅      |                                       |
 | Arithmetic comparison operators   | ✅      |                                       |
-| Arithmetic evaluation: `+/2`, `-/2`, `*/2`, `//2`, `mod/2` | ✅ | **ISO-required** - Used within `is/2` |
+| Arithmetic evaluation: `+/2`, `-/2`, `*/2`, `//2`, `///2`, `mod/2`, `div/2` | ✅      | **ISO-required** - Used within `is/2` |
 | Integer division: `div/2`         | ❌      | **ISO-required** - Missing operator   |
 | Unary operators: `-/1`, `+/1`     | ✅      | **ISO-required** - Negation and plus  |
 | Power operators: `^/2`, `**/2`    | ❌      | **ISO-required** - Exponentiation     |
