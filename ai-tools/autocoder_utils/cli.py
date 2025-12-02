@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 from .address_pr_comments import (
     address_pr_comments_with_amp as _address_pr_comments_with_amp,
@@ -151,12 +151,24 @@ def fix_issue_with_amp(argv: Sequence[str] | None = None) -> None:
     )
 
 
-def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
-    """CLI wrapper for addressing PR comments using Kilocode."""
+def _run_pr_comment_workflow(
+    argv: Sequence[str] | None,
+    handler_func: Callable[[str | None, int | None, bool], None],
+    tool_name: str,
+    default_timeout: int = 180,
+) -> None:
+    """Common PR comment workflow CLI parser.
+
+    Args:
+        argv: Command line arguments
+        handler_func: The function to call with parsed arguments (pr_number, timeout_seconds, debug)
+        tool_name: Display name of the tool
+        default_timeout: Default timeout in seconds
+    """
     arg_list, prog = _parser_inputs(argv)
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="Address PR review comments automatically with Kilocode.",
+        description=f"Address PR review comments automatically with {tool_name}.",
     )
     parser.add_argument(
         "pr_number",
@@ -166,8 +178,8 @@ def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None
     parser.add_argument(
         "--timeout",
         type=parse_timeout,
-        default=1200,
-        help="Seconds before Kilocode processing times out (default: %(default)s). Use 'off' to disable.",
+        default=default_timeout,
+        help=f"Seconds before {tool_name} processing times out (default: %(default)s). Use 'off' to disable.",
     )
     parser.add_argument(
         "--debug",
@@ -175,88 +187,47 @@ def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None
         help="Enable debug mode with step-by-step execution and detailed output",
     )
     args = parser.parse_args(arg_list)
-    _address_pr_comments_with_kilocode(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
+    handler_func(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
+
+
+def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
+    """CLI wrapper for addressing PR comments using Kilocode."""
+    _run_pr_comment_workflow(
+        argv,
+        _address_pr_comments_with_kilocode,
+        "Kilocode",
+        default_timeout=1200,
+    )
 
 
 def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
     """CLI wrapper for addressing PR comments using Claude Code."""
-    arg_list, prog = _parser_inputs(argv)
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description="Address PR review comments automatically with Claude headless mode.",
+    _run_pr_comment_workflow(
+        argv,
+        _address_pr_comments_with_claude,
+        "Claude headless mode",
+        default_timeout=180,
     )
-    parser.add_argument(
-        "pr_number",
-        nargs="?",
-        help="PR number to update (auto-detect from current branch when omitted)",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=parse_timeout,
-        default=180,
-        help="Seconds before Claude processing times out (default: %(default)s). Use 'off' to disable.",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug mode with step-by-step execution and detailed output",
-    )
-    args = parser.parse_args(arg_list)
-    _address_pr_comments_with_claude(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
 
 
 def address_pr_comments_with_codex(argv: Sequence[str] | None = None) -> None:
     """CLI wrapper for addressing PR comments using Codex."""
-    arg_list, prog = _parser_inputs(argv)
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description="Address PR review comments automatically with Codex headless mode.",
+    _run_pr_comment_workflow(
+        argv,
+        _address_pr_comments_with_codex,
+        "Codex headless mode",
+        default_timeout=180,
     )
-    parser.add_argument(
-        "pr_number",
-        nargs="?",
-        help="PR number to update (auto-detect from current branch when omitted)",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=parse_timeout,
-        default=180,
-        help="Seconds before Codex processing times out (default: %(default)s). Use 'off' to disable.",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug mode with step-by-step execution and detailed output",
-    )
-    args = parser.parse_args(arg_list)
-    _address_pr_comments_with_codex(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
 
 
 def address_pr_comments_with_amp(argv: Sequence[str] | None = None) -> None:
     """CLI wrapper for addressing PR comments using Amp."""
-    arg_list, prog = _parser_inputs(argv)
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description="Address PR review comments automatically with Amp headless mode.",
+    _run_pr_comment_workflow(
+        argv,
+        _address_pr_comments_with_amp,
+        "Amp headless mode",
+        default_timeout=180,
     )
-    parser.add_argument(
-        "pr_number",
-        nargs="?",
-        help="PR number to update (auto-detect from current branch when omitted)",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=parse_timeout,
-        default=180,
-        help="Seconds before Amp processing times out (default: %(default)s). Use 'off' to disable.",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug mode with step-by-step execution and detailed output",
-    )
-    args = parser.parse_args(arg_list)
-    _address_pr_comments_with_amp(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
 
 
 def generate_changelog(argv: Sequence[str] | None = None) -> None:
