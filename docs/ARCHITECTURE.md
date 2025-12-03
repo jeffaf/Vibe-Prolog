@@ -24,7 +24,7 @@ vibeprolog/
 
 ## Features & ISO Coverage
 
-See `FEATURES.md` for the full checklist of ISO predicates and syntax features.
+See `docs/FEATURES.md` for the full checklist of ISO predicates and syntax features.
 At the moment 102 entries in that matrix are marked ✅, covering ISO-style
 parsing, unification, backtracking execution, and a broad set of built-ins. Use
 that document to understand missing directives, error terms, and parser gaps.
@@ -184,7 +184,7 @@ non-deterministic predicates.
    ```
 
 4. **Add tests** in `tests/test_*.py`.
-5. **Update FEATURES.md** to mark the predicate as implemented.
+5. **Update docs/FEATURES.md** to mark the predicate as implemented.
 
 ## Tooling & Tests
 
@@ -325,6 +325,59 @@ job(bob, engineer).
 - Module-qualified calls use the syntax `Module:Goal` and resolve only against the specified module's predicates (and built-ins).
 - Export lists control which predicates are accessible from outside the module; attempting to call a non-exported predicate via `Module:Pred` raises a permission error.
 - The default module for non-module code is `user` and its predicates are globally accessible.
+
+### Standard Library
+
+The `./library/` directory contains standard Prolog library modules that define reusable predicates and operators. These are loaded via `:- use_module(library(Name))` directives.
+
+#### Operator and Predicate Exports
+
+Library modules export both predicates and operators through the module declaration:
+
+```prolog
+:- module(lists, [
+    append/3,
+    member/2,
+    length/2,
+    % ... exported predicates
+]).
+
+% Operators can also be exported if they are used by exported predicates:
+:- op(700, xfx, '=>').
+% If => is exported and used by an exported predicate, it becomes available
+```
+
+#### Operator Precedence Handling
+
+1. **Parser State**: Operators declared in library modules are collected before parsing any dependent code. When a module is loaded via `use_module/1,2`, its operators are registered in the operator table.
+
+2. **Inheritance**: Operators from imported modules become available to the importing code, allowing custom syntax defined in libraries to be used seamlessly.
+
+3. **Resolution Order**: When resolving predicates in module-qualified calls (`module:goal`), the engine:
+   - First checks the specified module's clauses
+   - Falls back to built-ins (always visible)
+   - Enforces export restrictions (non-exported predicates raise `permission_error`)
+
+4. **Dynamic Updates**: The `:- op(Precedence, Type, Name)` directive can be used within library modules to define custom operators that become available to dependent code through proper module loading.
+
+#### Library Module Structure
+
+Standard library modules follow this pattern:
+
+```prolog
+:- module(module_name, [exported_pred/1, exported_pred/2]).
+
+% Operator declarations (if needed)
+:- op(500, yfx, my_op).
+
+% Exported predicate implementations
+exported_pred(X) :- % implementation
+
+% Private helper predicates (not exported)
+helper_pred(X) :- % implementation
+```
+
+Modules in `./library/` are loaded with precedence over user-defined modules, allowing the standard library to provide foundational functionality that can be extended or overridden.
 
 ## Limitations
 

@@ -2,7 +2,7 @@
 ## Creating new work
 
 ```
-read [FEATURES.md](FEATURES.md) and [ARCHITECTURE.md](ARCHITECTURE.md) carefully, and review the goals in [AGENTS.md](AGENTS.md) 
+read [FEATURES.md](./FEATURES.md) and [ARCHITECTURE.md](./ARCHITECTURE.md) carefully, and review the goals in [AGENTS.md](../AGENTS.md) 
 
 look at [currentissuelist.json](.paige/currentissuelist.json) to understand the current github issues.
 
