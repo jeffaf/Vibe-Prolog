@@ -353,7 +353,7 @@ Attributed variables are the foundation for constraint logic programming. They a
 
 % Define a verify_attributes hook for constraint checking
 verify_attributes(Var, Value, []) :-
-    get_atts(Var, +domain(Domain)),
+    get_atts(Var, domain(Domain)),
     member(Value, Domain).
 
 % Use attributed variables
