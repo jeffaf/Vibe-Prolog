@@ -176,7 +176,7 @@ class TestSWIArithmetic:
         prolog = PrologInterpreter()
         result = prolog.query_once("X is 10 / 3")
         assert result is not None
-        assert abs(result['X'] - 3.333333) < 0.001
+        assert result['X'] == pytest.approx(10 / 3)
 
     def test_modulo(self):
         """
