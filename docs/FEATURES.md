@@ -339,7 +339,8 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | -------- | ---------- | ------ | ----- |
 | **Networking** | `tcp_socket/1`, `tcp_connect/4` | 🚫 Won't Implement | SWI-specific socket operations - out of scope |
 | **DDE (Windows)** | `open_dde_conversation/3`, `close_dde_conversation/1`, `dde_request/3`, `dde_execute/2`, `dde_poke/3`, `dde_register_service/2` | 🚫 Won't Implement | Windows Dynamic Data Exchange - obsolete technology |
-| **CLP(FD)** | `#=/2`, `#</2`, `#>/2`, `#=</2`, `#>=/2`, `ins/2`, `in/2` | ❌ | Constraint Logic Programming over Finite Domains |
+| **CLP(Z)** | `#=/2`, `#</2`, `#>/2`, `#=</2`, `#>=/2`, `ins/2`, `in/2`, etc. | 📘 | Constraint Logic Programming over Integers - Implemented in [library/clpz.pl](../library/clpz.pl) (8041 lines, Markus Triska) |
+| **CLP(B)** | `sat/1`, `taut/2`, `labeling/1`, Boolean operators | 📘 | Constraint Logic Programming over Booleans - Implemented in [library/clpb.pl](../library/clpb.pl) (1970 lines, Markus Triska) |
 | **Tabling** | `:- table/1` directive | 🔽 Low Priority | Tabled execution (memoization) - advanced optimization |
 | **CHR** | `:- chr_constraint/1` | ❌ | Constraint Handling Rules |
 | **RDF** | `:- rdf_meta/1` | 🔽 Low Priority | RDF (Resource Description Framework) support - specialized use case |
@@ -358,8 +359,9 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Clause body module resolution     | ✅      | Unqualified goals resolve via imports → defining module → user |
 | `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)`; library/ preferred over examples/modules/ for module resolution |
 | **Operator exports in module/2**  | ✅      | **SWI-Prolog compatible - operators can be exported**          |
-| Imported operator discovery       | ✅      | Operators declared in imported modules are collected before parsing dependents |
+| Imported operator discovery       | ✅      | Two-pass parsing: operators from `use_module` targets are pre-scanned and registered before parsing dependent code. Handles block comments, line comments, and recursive imports |
 | **Module-scoped predicate namespaces** | ✅  | Each module can define predicates with the same name/arity without conflict. `library(a):foo/1` and `library(b):foo/1` are distinct |
+| **DCG predicate indicators**      | ✅📘    | SWI-Prolog extension: `Name//Arity` in module exports (expanded to `Name/Arity+2`) |
 | Cross-module dynamic semantics    | ⚠️     | Implemented; dynamic predicate isolation per module needs further work |
 
 ---
@@ -375,15 +377,15 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Term manipulation         | ✅ Strong                                                   |
 | Atom processing (§8.16)   | ✅ Strong                                                   |
 | Arithmetic                | ✅ Strong                                                   |
-| List operations           | ⚠️ Core ops ✅, missing higher-order predicates (maplist, foldl, etc.) |
+| List operations           | ✅ Strong - Including higher-order predicates (maplist, foldl, include, exclude) |
 | All-solutions             | ✅ Strong                                                   |
-| Meta-predicates           | ⚠️ Core meta-preds implemented; higher-order list ops missing |
-| Database operations       | ⚠️ Strong, missing `retractall/1`                           |
+| Meta-predicates           | ✅ Strong - Including higher-order list operations          |
+| Database operations       | ✅ Strong - All ISO-required predicates implemented         |
 | Character I/O (§8.11)     | ✅ Strong - All ISO-required predicates implemented         |
 | Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
 | Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
-| Parsing & syntax          | ⚠️ op/3 ✅, custom operator syntax parsing ✅, missing ISO operators (div, ^, /\, etc.), char_conversion ❌ |
+| Parsing & syntax          | ⚠️ op/3 ✅, custom operator syntax parsing ✅, ISO operators ✅, missing: prefix `:-` and char_conversion ❌ |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
 | Reflection                | ⚠️ Partial                                                 |
 
@@ -391,19 +393,16 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 
 ## ISO Blocking Issues
 
-1. **Missing operators** - Several ISO-required operators are not defined in the operator table:
-   - Arithmetic: `div`, `rem`, `^`, `**`
-   - Bitwise: `/\`, `\/`, `\`, `<<`, `>>`
-   - Directives: `:-` (prefix), `?-`, `-->`
-2. `op/3` affects parsing (§6.3) - Operators declared dynamically update the parser grammar
-3. `char_conversion/2` missing (§6.4, §7.4)
+1. **Directive prefix operator** - The prefix form of `:-` (1200, fx) is not yet implemented
+2. `char_conversion/2` missing (§6.4, §7.4) - ISO-mandatory character conversion directive
 
-## Common Extensions Worth Implementing
+## Common Extensions Status
 
-Based on analysis of real-world Prolog programs, these commonly-used predicates would improve compatibility:
+Common extensions frequently used in real-world Prolog programs:
 
-1. **List utilities** - `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
-2. **Higher-order** - `maplist/3-5` (currently only `/2` implemented), `include/3`, `exclude/3`
+1. **List utilities** - ✅ Implemented: `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
+2. **Higher-order** - ✅ Implemented: `maplist/3-5`, `include/3`, `exclude/3`, `partition/4`, `foldl/4-6`
+3. **Constraint solving** - 📘 Available as libraries: CLP(Z) in [library/clpz.pl](../library/clpz.pl), CLP(B) in [library/clpb.pl](../library/clpb.pl)
 
 ---
 

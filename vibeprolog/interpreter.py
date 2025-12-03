@@ -17,6 +17,7 @@ from vibeprolog.parser import (
     PredicateIndicator,
     PredicatePropertyDirective,
     PrologParser,
+    _strip_comments,
     extract_op_directives,
     tokenize_prolog_statements,
 )
@@ -214,6 +215,17 @@ class PrologInterpreter:
                         names = self.operator_table._parse_operator_names(name_term, "module/2")
                         for name in names:
                             exported_operators.add((precedence, spec, name))
+                    # Handle DCG indicator Name//Arity (SWI-Prolog extension)
+                    # The "//" is parsed as a compound with functor "//" 
+                    elif isinstance(elt, Compound) and elt.functor == "//" and len(elt.args) == 2:
+                        name_arg, arity_arg = elt.args
+                        normalized_name = self._normalize_operator_in_indicator(name_arg)
+                        if not isinstance(normalized_name, Atom) or not isinstance(arity_arg, Number):
+                            error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
+                            raise PrologThrow(error_term)
+                        # DCG predicates get +2 to their arity when expanded
+                        # Export both the DCG form and the expanded form
+                        exports.add((normalized_name.name, int(arity_arg.value) + 2))
                     # Each elt should be Name/Arity (Compound "/") or op/3
                     elif isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
                         name_arg, arity_arg = elt.args
@@ -446,6 +458,7 @@ class PrologInterpreter:
 
         return (resolved_import, None)
 
+
     def _extract_import_terms(
         self, prolog_code: str, directive_ops: list[tuple[int, str, str]]
     ) -> list[tuple[Any, bool]]:
@@ -465,7 +478,8 @@ class PrologInterpreter:
         """
         imports: list[tuple[Any, bool]] = []
         for chunk in tokenize_prolog_statements(prolog_code):
-            stripped = chunk.strip()
+            # Strip comments to find the actual directive
+            stripped = _strip_comments(chunk).strip()
             if not stripped.startswith(":-"):
                 continue
             try:

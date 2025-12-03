@@ -821,6 +821,14 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
 
         # Handle period (end of clause)
         if char == '.' and not in_single_quote and not in_double_quote:
+            # Check for ... (ellipsis) or .. (range operator)
+            if prolog_code[i:i+3] == '...':
+                current.append('.')
+                current.append('.')
+                current.append('.')
+                has_code = True
+                i += 3
+                continue
             if prolog_code[i:i+2] == '..':
                 current.append('.')
                 current.append('.')
@@ -936,6 +944,94 @@ def _parse_operator_name_list(raw: str) -> list[str]:
     return operators
 
 
+def _strip_comments(text: str) -> str:
+    """Strip line and block comments from text, preserving content inside quoted strings.
+    
+    Args:
+        text: Prolog source code that may contain comments
+        
+    Returns:
+        Text with comments removed
+    """
+    result = []
+    i = 0
+    in_single_quote = False
+    in_double_quote = False
+    escape_next = False
+    block_depth = 0
+    
+    while i < len(text):
+        char = text[i]
+        
+        if escape_next:
+            if block_depth == 0:
+                result.append(char)
+            escape_next = False
+            i += 1
+            continue
+        
+        if char == '\\' and (in_single_quote or in_double_quote):
+            if block_depth == 0:
+                result.append(char)
+            escape_next = True
+            i += 1
+            continue
+        
+        # Handle block comments
+        if block_depth > 0:
+            if text[i:i+2] == '/*':
+                block_depth += 1
+                i += 2
+                continue
+            if text[i:i+2] == '*/':
+                block_depth -= 1
+                i += 2
+                continue
+            i += 1
+            continue
+        
+        if char == "'" and not in_double_quote:
+            # Check for doubled quote escape inside single-quoted strings
+            if in_single_quote and i + 1 < len(text) and text[i + 1] == "'":
+                result.append(char)
+                result.append(text[i + 1])
+                i += 2
+                continue
+            in_single_quote = not in_single_quote
+            result.append(char)
+            i += 1
+            continue
+        
+        if char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+            result.append(char)
+            i += 1
+            continue
+        
+        # Check for comment starts outside quoted strings
+        if not in_single_quote and not in_double_quote:
+            # Check for block comment start
+            if text[i:i+2] == '/*':
+                block_depth = 1
+                i += 2
+                continue
+            # Check for line comment
+            if char == '%':
+                # Skip until end of line
+                while i < len(text) and text[i] != '\n':
+                    i += 1
+                # Skip the newline if present
+                if i < len(text) and text[i] == '\n':
+                    result.append('\n')
+                    i += 1
+                continue
+        
+        result.append(char)
+        i += 1
+    
+    return ''.join(result)
+
+
 def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
     """Extract op/3 directives from source code, including operators in module export lists.
 
@@ -965,14 +1061,17 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
             operators.append((precedence, op_type, op_name))
 
     for statement in tokenize_prolog_statements(source):
+        # Strip comments before matching to handle block comments at start of statement
+        stripped = _strip_comments(statement).strip()
+        
         # Check for op/3 directives
-        match = directive_pattern.match(statement.strip())
+        match = directive_pattern.match(stripped)
         if match:
             _try_parse_op(match.group(1))
             continue
 
         # Check for module/2 with op/3 in export list
-        match = module_pattern.match(statement.strip())
+        match = module_pattern.match(stripped)
         if match:
             exports_str = match.group(2)
             export_items = _split_top_level_commas(exports_str)
