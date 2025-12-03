@@ -235,23 +235,33 @@ class AttributedUnificationContext:
             pending_verifications is a list of (attvar, value) pairs that
             need verify_attributes/3 calls.
         """
+        store = getattr(self.engine, "_attribute_store", {})
+        
+        # Dereference terms before unification to find attributed variables
+        deref1 = deref(term1, subst)
+        deref2 = deref(term2, subst)
+        
+        # Check which terms are attributed variables BEFORE unification
+        attvar1 = isinstance(deref1, Variable) and deref1.name in store and store[deref1.name]
+        attvar2 = isinstance(deref2, Variable) and deref2.name in store and store[deref2.name]
+        
         # Perform base unification
         new_subst = unify(term1, term2, subst)
         if new_subst is None:
             return None, []
 
-        # Minimal placeholder for merging attributes when both sides have attrs.
-        # This is a scaffold; actual robust merging should be implemented
-        # according to SICStus/Scryer semantics and wired into the engine.
-        store = getattr(self.engine, "_attribute_store", {})
-        merged = False
-        involved_vars = []
-        for t in (term1, term2):
-            v = deref(t, new_subst)
-            if isinstance(v, Variable) and v.name in store and store[v.name]:
-                involved_vars.append(v)
-        if len(involved_vars) >= 2:
-            v1, v2 = involved_vars[0], involved_vars[1]
+        pending = []
+        
+        # Case 1: Attributed variable unified with a non-variable value
+        if attvar1 and not isinstance(deref2, Variable):
+            # deref1 is an attvar being unified with value deref2
+            pending.append((deref1, deref2))
+        elif attvar2 and not isinstance(deref1, Variable):
+            # deref2 is an attvar being unified with value deref1
+            pending.append((deref2, deref1))
+        elif attvar1 and attvar2:
+            # Both are attributed variables - merge attributes
+            v1, v2 = deref1, deref2
             attrs1 = store.get(v1.name, {})
             attrs2 = store.get(v2.name, {})
             for k, val in attrs2.items():
@@ -260,10 +270,17 @@ class AttributedUnificationContext:
             store[v1.name] = attrs1
             if v2.name in store:
                 del store[v2.name]
-            merged = True
-        pending = []
-        if merged:
-            return new_subst, pending
+        elif attvar1 and isinstance(deref2, Variable):
+            # attvar unified with plain variable - check if variable gets bound
+            new_deref = deref(deref1, new_subst)
+            if not isinstance(new_deref, Variable):
+                pending.append((deref1, new_deref))
+        elif attvar2 and isinstance(deref1, Variable):
+            # attvar unified with plain variable - check if variable gets bound
+            new_deref = deref(deref2, new_subst)
+            if not isinstance(new_deref, Variable):
+                pending.append((deref2, new_deref))
+        
         return new_subst, pending
 
 

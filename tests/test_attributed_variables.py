@@ -243,6 +243,7 @@ class TestIntegration:
         prolog.consult_string("""
             verify_attributes(Var, Value, []) :-
                 get_atts(Var, +integer_only),
+                !,
                 integer(Value).
             verify_attributes(_, _, []).
         """)
@@ -264,6 +265,7 @@ class TestIntegration:
         prolog.consult_string("""
             verify_attributes(Var, Value, []) :-
                 get_atts(Var, domain(Domain)),
+                !,
                 member(Value, Domain).
             verify_attributes(_, _, []).
         """)
