@@ -14,22 +14,22 @@ if (!existsSync(contentDir)) {
 
 // List of markdown files to copy
 const files = [
-  'README.md',
-  'FEATURES.md',
-  'ARCHITECTURE.md',
-  'AGENTS.md',
+  { src: 'README.md', dest: 'README.md' },
+  { src: 'docs/FEATURES.md', dest: 'FEATURES.md' },
+  { src: 'docs/ARCHITECTURE.md', dest: 'ARCHITECTURE.md' },
+  { src: 'AGENTS.md', dest: 'AGENTS.md' },
 ];
 
 console.log('Copying markdown files...');
 files.forEach(file => {
-  const src = join(rootDir, file);
-  const dest = join(contentDir, file);
+  const src = join(rootDir, file.src);
+  const dest = join(contentDir, file.dest);
 
   if (existsSync(src)) {
     copyFileSync(src, dest);
-    console.log(`  ✓ Copied ${file}`);
+    console.log(`  ✓ Copied ${file.src} → ${file.dest}`);
   } else {
-    console.warn(`  ⚠ File not found: ${file}`);
+    console.warn(`  ⚠ File not found: ${file.src}`);
   }
 });
 

@@ -25,13 +25,13 @@ This document provides an overview of the project structure and guidelines for d
 
 ## Project Structure
 
-See @ARCHITECTURE.md
+See @docs/ARCHITECTURE.md
 
 ## Features
 
-See @FEATURES.md
+See @docs/FEATURES.md
 
-You must keep ./FEATURES.md up to date when you add or change these
+You must keep ./docs/FEATURES.md up to date when you add or change these
 
 ## Error Handling 
 
