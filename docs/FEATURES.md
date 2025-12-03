@@ -385,7 +385,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
 | Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
-| Parsing & syntax          | ⚠️ op/3 ✅, custom operator syntax parsing ✅, missing ISO operators (div, ^, /\, etc.), char_conversion ❌ |
+| Parsing & syntax          | ⚠️ op/3 ✅, custom operator syntax parsing ✅, ISO operators ✅, missing: prefix `:-` and char_conversion ❌ |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
 | Reflection                | ⚠️ Partial                                                 |
 
@@ -393,19 +393,16 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 
 ## ISO Blocking Issues
 
-1. **Missing operators** - Several ISO-required operators are not defined in the operator table:
-   - Arithmetic: `div`, `rem`, `^`, `**`
-   - Bitwise: `/\`, `\/`, `\`, `<<`, `>>`
-   - Directives: `:-` (prefix), `?-`, `-->`
-2. `op/3` affects parsing (§6.3) - Operators declared dynamically update the parser grammar
-3. `char_conversion/2` missing (§6.4, §7.4)
+1. **Directive prefix operator** - The prefix form of `:-` (1200, fx) is not yet implemented
+2. `char_conversion/2` missing (§6.4, §7.4) - ISO-mandatory character conversion directive
 
-## Common Extensions Worth Implementing
+## Common Extensions Status
 
-Based on analysis of real-world Prolog programs, these commonly-used predicates would improve compatibility:
+Common extensions frequently used in real-world Prolog programs:
 
-1. **List utilities** - `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
-2. **Higher-order** - `maplist/3-5` (currently only `/2` implemented), `include/3`, `exclude/3`
+1. **List utilities** - ✅ Implemented: `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
+2. **Higher-order** - ✅ Implemented: `maplist/3-5`, `include/3`, `exclude/3`, `partition/4`, `foldl/4-6`
+3. **Constraint solving** - 📘 Available as libraries: CLP(Z) in [library/clpz.pl](../library/clpz.pl), CLP(B) in [library/clpb.pl](../library/clpb.pl)
 
 ---
 
