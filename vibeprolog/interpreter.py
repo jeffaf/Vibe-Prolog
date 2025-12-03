@@ -387,8 +387,8 @@ class PrologInterpreter:
 
     def _extract_import_terms(
         self, prolog_code: str, directive_ops: list[tuple[int, str, str]]
-    ) -> list:
-        imports: list = []
+    ) -> list[tuple[Any, bool]]:
+        imports: list[tuple[Any, bool]] = []
         temp_parser = PrologParser(OperatorTable())
         for chunk in tokenize_prolog_statements(prolog_code):
             stripped = chunk.strip()
@@ -412,34 +412,53 @@ class PrologInterpreter:
                     continue
                 if goal.functor in {"use_module", "ensure_loaded", "consult"}:
                     if len(goal.args) == 1:
-                        imports.append(goal.args[0])
+                        imports.append((goal.args[0], True))
                     elif goal.functor == "use_module" and len(goal.args) == 2:
-                        imports.append(goal.args[0])
+                        # Selective imports (with list) do not import operators
+                        imports.append((goal.args[0], False))
         return imports
 
     def _collect_module_operators_from_file(
         self, filepath: Path, visited: set[str]
     ) -> list[tuple[int, str, str]]:
-        resolved_path = str(filepath.resolve())
-        if resolved_path in self._import_operator_cache:
-            return list(self._import_operator_cache[resolved_path])
-        if resolved_path in visited:
+        raw_path = str(filepath)
+        path_exists = filepath.exists()
+        cache_key = str(filepath.resolve()) if path_exists else raw_path
+        if cache_key in self._import_operator_cache:
+            return list(self._import_operator_cache[cache_key])
+        if cache_key in visited:
             return []
 
-        visited.add(resolved_path)
+        visited.add(cache_key)
+
+        if not path_exists:
+            module_match = next(
+                (mod for mod in self.modules.values() if mod.file == raw_path),
+                None,
+            )
+            if module_match is not None:
+                exported = list(module_match.exported_operators)
+                self._import_operator_cache[cache_key] = exported
+                visited.remove(cache_key)
+                return exported
+            visited.remove(cache_key)
+            return []
+
         with open(filepath, "r") as handle:
             module_source = handle.read()
 
         try:
             local_ops = extract_op_directives(module_source)
         except ValueError as exc:
-            visited.remove(resolved_path)
+            visited.remove(cache_key)
             error_term = PrologError.syntax_error(str(exc), "consult/1")
             raise PrologThrow(error_term)
         imports = self._extract_import_terms(module_source, local_ops)
 
         collected_ops: list[tuple[int, str, str]] = []
-        for import_term in imports:
+        for import_term, include_ops in imports:
+            if not include_ops:
+                continue
             try:
                 resolved_import = self._resolve_module_file(
                     import_term, "use_module/1,2", base_path=filepath.parent
@@ -459,8 +478,8 @@ class PrologInterpreter:
             )
 
         collected_ops.extend(local_ops)
-        self._import_operator_cache[resolved_path] = list(collected_ops)
-        visited.remove(resolved_path)
+        self._import_operator_cache[cache_key] = list(collected_ops)
+        visited.remove(cache_key)
         return collected_ops
 
     def _collect_imported_operators(
@@ -474,7 +493,9 @@ class PrologInterpreter:
         collected_ops: list[tuple[int, str, str]] = []
 
         import_terms = self._extract_import_terms(prolog_code, local_directives)
-        for import_term in import_terms:
+        for import_term, include_ops in import_terms:
+            if not include_ops:
+                continue
             try:
                 resolved_import = self._resolve_module_file(
                     import_term, "use_module/1,2", base_path=base_path
@@ -486,9 +507,10 @@ class PrologInterpreter:
             if resolved_import.startswith("loaded:"):
                 loaded_name = resolved_import[7:]
                 loaded_module = self.modules.get(loaded_name)
-                if loaded_module is None or loaded_module.file is None:
+                if loaded_module is None:
                     continue
-                resolved_import = loaded_module.file
+                collected_ops.extend(list(loaded_module.exported_operators))
+                continue
 
             collected_ops.extend(
                 self._collect_module_operators_from_file(Path(resolved_import), visited)
