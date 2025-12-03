@@ -48,7 +48,8 @@ Status legend:
 | Negation as failure (`\\+/1`)   | ✅      |                                    |
 | First-argument indexing         | ✅      | O(1) clause lookup for large DBs   |
 | Occurs check                    | ⚠️     | Always enabled (stricter than ISO) |
-| Recursion handling with depth limits | ✅      | Configurable recursion depth limit (default: 500) |
+| Recursion handling with depth limits | ✅      | Configurable recursion depth limit (default: 10,000); supports deep tail recursion |
+| Python recursion limit management | ✅      | Automatically increases Python's recursion limit to support Prolog depth |
 
 ---
 

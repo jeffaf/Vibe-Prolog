@@ -8,6 +8,19 @@ from typing import Any, Callable, Iterator, TypeAlias
 import sys
 from dataclasses import dataclass
 
+# Increase Python recursion limit to support deeper Prolog recursion
+# This allows the Python call stack to accommodate Prolog's logical recursion depth
+_original_recursion_limit = sys.getrecursionlimit()
+if _original_recursion_limit < 50000:
+    try:
+        sys.setrecursionlimit(50000)
+    except (RecursionError, ValueError):
+        # If we can't set it that high, try a more modest increase
+        try:
+            sys.setrecursionlimit(min(_original_recursion_limit * 10, 32767))
+        except (RecursionError, ValueError):
+            pass  # Use system default if all attempts fail
+
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Clause, Cut, List
 from vibeprolog.operators import OperatorTable
@@ -42,7 +55,7 @@ class PrologEngine:
         predicate_sources: dict[tuple[str, int], set[str]] | None = None,
         predicate_docs: dict[tuple[str, int], str] | None = None,
         operator_table: OperatorTable | None = None,
-        max_depth: int = 500,
+        max_depth: int = 10000,
     ):
         self.clauses = clauses
         # Explicit dependency so engine can reference interpreter state if needed

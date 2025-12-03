@@ -53,7 +53,7 @@ class PrologInterpreter:
     def __init__(
         self,
         argv: list[str] | None = None,
-        max_recursion_depth: int = 400,
+        max_recursion_depth: int = 10000,
         builtin_conflict: str = "skip",
     ) -> None:
         self.operator_table = OperatorTable()
