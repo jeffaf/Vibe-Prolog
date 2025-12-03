@@ -108,8 +108,9 @@ def shadow_prolog():
     prolog = PrologInterpreter(builtin_conflict="shadow")
     prolog.consult_string("""
         :- module(test_mod, [length/2, test_length/2]).
-        length([], 0).
-        length([_|T], N) :- length(T, N1), N is N1 + 1.
+        % This version returns a Peano-style number to distinguish from the built-in
+        length([], zero).
+        length([_|T], s(N)) :- length(T, N).
         test_length(List, N) :- length(List, N).
     """)
     return prolog
