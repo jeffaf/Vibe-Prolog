@@ -662,12 +662,7 @@ class PrologInterpreter:
                 raise PrologThrow(error_term)
 
             # Get or create module-scoped properties
-            properties = self._get_module_predicate_properties(module_name, key)
-            if not properties:
-                properties = set()
-            else:
-                # Make a copy to avoid modifying the cached set directly
-                properties = set(properties)
+            properties = self._get_module_predicate_properties(module_name, key).copy()
 
             if directive.property == "dynamic":
                 properties.discard("static")
