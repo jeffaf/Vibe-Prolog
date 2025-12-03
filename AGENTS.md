@@ -40,7 +40,7 @@ You must keep ./docs/FEATURES.md up to date when you add or change these
 Standard documentation files:
 - `@docs/ARCHITECTURE.md` - System architecture and design
 - `@docs/FEATURES.md` - ISO Prolog conformance matrix and feature checklist
-- `@docs/` - Any additional documentation, guides, or specs
+- Any additional documentation, guides, or specs should be added as new files within the `@docs/` directory.
 
 ## Error Handling 
 
