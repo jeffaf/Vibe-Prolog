@@ -103,17 +103,95 @@ class TestBuiltinConflictErrorMode:
 
 
 class TestBuiltinConflictShadowMode:
-    """Tests for shadow mode (placeholder - not yet implemented)."""
+    """Tests for shadow mode."""
 
-    def test_shadow_mode_falls_back_to_skip_programmatically(self):
-        """Programmatically, shadow mode should fall back to 'skip' behavior."""
+    def test_shadow_mode_allows_module_to_define_builtin(self):
+        """Shadow mode should allow modules to define predicates that shadow built-ins."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
-        # Define a predicate that conflicts with the built-in length/2
         prolog.consult_string("""
-            length([], zero).
+            :- module(test_mod, [length/2]).
+            length([], 0).
+            length([_|T], N) :- length(T, N1), N is N1 + 1.
         """)
-        # The built-in length/2 should still work, proving the redefinition was skipped.
+        # Should not raise an error
+
+    def test_shadow_mode_module_qualified_uses_module_version(self):
+        """Module-qualified calls should use the module's shadowing definition."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        prolog.consult_string("""
+            :- module(test_mod, [length/2]).
+            length([], 0).
+            length([_|T], N) :- length(T, N1), N is N1 + 1.
+        """)
+        result = prolog.query_once("test_mod:length([a, b, c], L)")
+        assert result is not None
+        assert result["L"] == 3
+
+    def test_shadow_mode_unqualified_uses_builtin(self):
+        """Unqualified calls from user context should use the built-in."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        prolog.consult_string("""
+            :- module(test_mod, [length/2]).
+            length([], 0).
+            length([_|T], N) :- length(T, N1), N is N1 + 1.
+        """)
+        result = prolog.query_once("length([a, b, c], L)")
+        assert result is not None
+        assert result["L"] == 3  # Built-in returns integer
+
+    def test_shadow_mode_within_module_body_uses_shadow(self):
+        """Within module clause bodies, unqualified calls should use the shadowing definition."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        prolog.consult_string("""
+            :- module(test_mod, [test_length/2]).
+            length([], 0).
+            length([_|T], N) :- length(T, N1), N is N1 + 1.
+            test_length(List, N) :- length(List, N).
+        """)
+        result = prolog.query_once("test_mod:test_length([a, b, c], L)")
+        assert result is not None
+        assert result["L"] == 3
+
+    def test_shadow_mode_import_behavior(self):
+        """Test import behavior with shadowed predicates."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        prolog.consult_string("""
+            :- module(test_mod, [length/2]).
+            length([], 0).
+            length([_|T], N) :- length(T, N1), N is N1 + 1.
+        """)
+        # Import the shadowed predicate
+        prolog.consult_string(":- use_module(test_mod, [length/2]).")
+        # Unqualified call should now use the imported shadow
         result = prolog.query_once("length([a, b], L)")
+        assert result is not None
+        assert result["L"] == 2
+
+    def test_shadow_mode_full_module_import(self):
+        """Full module import should bring in shadowed predicates."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        prolog.consult_string("""
+            :- module(test_mod, [length/2]).
+            length([], 0).
+            length([_|T], N) :- length(T, N1), N is N1 + 1.
+        """)
+        # Full import
+        prolog.consult_string(":- use_module(test_mod).")
+        # Unqualified call should use the shadow
+        result = prolog.query_once("length([a, b], L)")
+        assert result is not None
+        assert result["L"] == 2
+
+    def test_shadow_mode_user_qualification_uses_builtin(self):
+        """user: qualification should use the built-in even when shadowed."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        prolog.consult_string("""
+            :- module(test_mod, [length/2]).
+            length([], 0).
+            length([_|T], N) :- length(T, N1), N is N1 + 1.
+        """)
+        # user: should use built-in
+        result = prolog.query_once("user:length([a, b], L)")
         assert result is not None
         assert result["L"] == 2
 
@@ -173,10 +251,15 @@ class TestBuiltinConflictCLI:
             assert result.returncode != 0
             assert "permission_error" in result.stderr or "Error" in result.stderr
 
-    def test_cli_shadow_mode_not_implemented(self):
-        """Shadow mode should print error and exit."""
+    def test_cli_shadow_mode_works(self):
+        """Shadow mode should work via CLI."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".pl", delete=False) as f:
-            f.write("test_fact(1).\n")
+            f.write("""
+:- module(test_mod, [length/2]).
+length([], 0).
+length([_|T], N) :- length(T, N1), N is N1 + 1.
+test_fact(1).
+""")
             f.flush()
             result = subprocess.run(
                 [
@@ -185,13 +268,13 @@ class TestBuiltinConflictCLI:
                     "--builtin-conflict=shadow",
                     f.name,
                     "-q",
-                    "true",
+                    "test_mod:length([a,b], L)",
                 ],
                 capture_output=True,
                 text=True,
             )
-            assert result.returncode == 1
-            assert "not yet implemented" in result.stderr
+            assert result.returncode == 0
+            assert "2" in result.stdout
 
     def test_cli_invalid_mode_rejected(self):
         """Invalid mode should be rejected by argparse."""
