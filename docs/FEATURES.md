@@ -402,3 +402,49 @@ Based on analysis of real-world Prolog programs, these commonly-used predicates 
 
 1. **List utilities** - `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
 2. **Higher-order** - `maplist/3-5` (currently only `/2` implemented), `include/3`, `exclude/3`
+
+---
+
+## Command-Line Options
+
+### `--builtin-conflict` Flag
+
+Controls how the interpreter handles library definitions that conflict with built-in predicates.
+
+**Syntax:**
+```
+--builtin-conflict=MODE
+```
+
+**Modes:**
+
+| Mode | Behavior |
+|------|----------|
+| `skip` | **(Default)** Silently skip the library definition and use the existing built-in. Allows libraries like `clpz` to load without errors. |
+| `error` | Raise a `permission_error` when a library tries to redefine a built-in predicate. Useful for strict checking and debugging library compatibility. |
+| `shadow` | *Reserved for future implementation.* Will allow modules to shadow built-ins within their namespace. Currently raises "not implemented" error. |
+
+**Examples:**
+
+```bash
+# Default behavior - skip conflicts silently
+uv run vibeprolog.py ./examples/sudoku.pl
+
+# Strict mode - fail on conflicts
+uv run vibeprolog.py --builtin-conflict=error ./examples/sudoku.pl
+```
+
+**Programmatic Usage:**
+
+```python
+from vibeprolog import PrologInterpreter
+
+# Default (skip mode)
+prolog = PrologInterpreter()
+
+# Explicit skip mode
+prolog = PrologInterpreter(builtin_conflict="skip")
+
+# Error mode for strict checking
+prolog = PrologInterpreter(builtin_conflict="error")
+```

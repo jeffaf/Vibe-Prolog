@@ -50,7 +50,12 @@ class Module:
 class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
-    def __init__(self, argv: list[str] | None = None, max_recursion_depth: int = 400) -> None:
+    def __init__(
+        self,
+        argv: list[str] | None = None,
+        max_recursion_depth: int = 400,
+        builtin_conflict: str = "skip",
+    ) -> None:
         self.operator_table = OperatorTable()
         self.parser = PrologParser(self.operator_table)
         self._import_scanner_parser = PrologParser(OperatorTable())
@@ -61,6 +66,7 @@ class PrologInterpreter:
 
         self._argv: list[str] = argv or []
         self.max_recursion_depth = max_recursion_depth
+        self.builtin_conflict = builtin_conflict
         self.engine = None
         self.initialization_goals = []
         self.predicate_properties: dict[tuple[str, int], set[str]] = {}
@@ -751,11 +757,16 @@ class PrologInterpreter:
             properties.discard("static")
 
         if "built_in" in properties:
-            indicator = self._indicator_from_key(key)
-            error_term = PrologError.permission_error(
-                "modify", "static_procedure", indicator, "consult/1"
-            )
-            raise PrologThrow(error_term)
+            if self.builtin_conflict == "skip":
+                # Silently skip the library definition and use the existing built-in
+                return last_predicate
+            elif self.builtin_conflict == "error":
+                indicator = self._indicator_from_key(key)
+                error_term = PrologError.permission_error(
+                    "modify", "static_procedure", indicator, "consult/1"
+                )
+                raise PrologThrow(error_term)
+            # Note: "shadow" mode is not implemented; it's rejected at CLI level
 
         sources = self._predicate_sources.setdefault(key, set())
         if "static" in properties and sources and source_name not in sources and "multifile" not in properties:

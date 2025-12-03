@@ -239,10 +239,25 @@ Examples:
         help='Always show variable bindings even when query produces output (default: suppress bindings when output is produced)'
     )
 
+    parser.add_argument(
+        '--builtin-conflict',
+        choices=['skip', 'error', 'shadow'],
+        default='skip',
+        help='How to handle library definitions that conflict with built-in predicates: '
+             'skip (default) silently uses the built-in, '
+             'error raises permission_error, '
+             'shadow is reserved for future use'
+    )
+
     args = parser.parse_args()
 
+    # Handle shadow mode (not yet implemented)
+    if args.builtin_conflict == 'shadow':
+        print("Error: --builtin-conflict=shadow is not yet implemented", file=sys.stderr)
+        return 1
+
     # Create interpreter
-    prolog = PrologInterpreter(argv=args.program_args)
+    prolog = PrologInterpreter(argv=args.program_args, builtin_conflict=args.builtin_conflict)
 
     # Load the program
     if not load_program(prolog, args.file, args.verbose):
