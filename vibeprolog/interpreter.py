@@ -432,56 +432,55 @@ class PrologInterpreter:
 
         visited.add(cache_key)
 
-        if not path_exists:
-            module_match = next(
-                (mod for mod in self.modules.values() if mod.file == raw_path),
-                None,
-            )
-            if module_match is not None:
-                exported = list(module_match.exported_operators)
-                self._import_operator_cache[cache_key] = exported
-                visited.remove(cache_key)
-                return exported
-            visited.remove(cache_key)
-            return []
-
-        with open(filepath, "r") as handle:
-            module_source = handle.read()
-
         try:
-            local_ops = extract_op_directives(module_source)
-        except ValueError:
-            visited.remove(cache_key)
-            self._import_operator_cache[cache_key] = []
-            return []
-        imports = self._extract_import_terms(module_source, local_ops)
-
-        collected_ops: list[tuple[int, str, str]] = []
-        for import_term, include_ops in imports:
-            if not include_ops:
-                continue
-            try:
-                resolved_import = self._resolve_module_file(
-                    import_term, "use_module/1,2", base_path=filepath.parent
+            if not path_exists:
+                module_match = next(
+                    (mod for mod in self.modules.values() if mod.file == raw_path),
+                    None,
                 )
-            except PrologThrow:
-                continue
+                if module_match is not None:
+                    exported = list(module_match.exported_operators)
+                    self._import_operator_cache[cache_key] = exported
+                    return exported
+                return []
 
-            if resolved_import.startswith("loaded:"):
-                loaded_name = resolved_import[7:]
-                loaded_module = self.modules.get(loaded_name)
-                if loaded_module is None or loaded_module.file is None:
+            with open(filepath, "r") as handle:
+                module_source = handle.read()
+
+            try:
+                local_ops = extract_op_directives(module_source)
+            except ValueError:
+                self._import_operator_cache[cache_key] = []
+                return []
+            imports = self._extract_import_terms(module_source, local_ops)
+
+            collected_ops: list[tuple[int, str, str]] = []
+            for import_term, include_ops in imports:
+                if not include_ops:
                     continue
-                resolved_import = loaded_module.file
+                try:
+                    resolved_import = self._resolve_module_file(
+                        import_term, "use_module/1,2", base_path=filepath.parent
+                    )
+                except PrologThrow:
+                    continue
 
-            collected_ops.extend(
-                self._collect_module_operators_from_file(Path(resolved_import), visited)
-            )
+                if resolved_import.startswith("loaded:"):
+                    loaded_name = resolved_import[7:]
+                    loaded_module = self.modules.get(loaded_name)
+                    if loaded_module is None or loaded_module.file is None:
+                        continue
+                    resolved_import = loaded_module.file
 
-        collected_ops.extend(local_ops)
-        self._import_operator_cache[cache_key] = list(collected_ops)
-        visited.remove(cache_key)
-        return collected_ops
+                collected_ops.extend(
+                    self._collect_module_operators_from_file(Path(resolved_import), visited)
+                )
+
+            collected_ops.extend(local_ops)
+            self._import_operator_cache[cache_key] = list(collected_ops)
+            return collected_ops
+        finally:
+            visited.remove(cache_key)
 
     def _collect_imported_operators(
         self,
