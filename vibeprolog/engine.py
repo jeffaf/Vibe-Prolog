@@ -1018,15 +1018,13 @@ class PrologEngine:
             renamed_clause = self._rename_variables(clause)
             head = renamed_clause.head
             
-            temp_subst = unify(attvar_proxy, head.args[0], subst)
-            if temp_subst is None:
+            clause_subst = unify(verify_goal, head, subst)
+            if clause_subst is None:
                 continue
-                
-            new_var = deref(attvar_proxy, temp_subst)
+            
+            new_var = deref(attvar_proxy, clause_subst)
             if isinstance(new_var, Variable) and new_var.name != old_attvar_name:
                 self._attribute_store[new_var.name] = var_attrs.copy()
-            
-            clause_subst = unify(verify_goal, head, subst)
             if clause_subst is None:
                 continue
             
