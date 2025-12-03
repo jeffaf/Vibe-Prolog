@@ -742,44 +742,39 @@ class PrologInterpreter:
     def _get_module_predicate_properties(
         self, module_name: str, key: tuple[str, int]
     ) -> set[str]:
-        """Get predicate properties for a specific module, defaulting to static."""
+        """Get predicate properties for a specific module. Returns an empty set if not found."""
         # First check if it's a built-in (global)
         if key in self.predicate_properties:
             props = self.predicate_properties[key]
             if "built_in" in props:
                 return props
-        
+
         # Check module-specific properties
         module_props = self._module_predicate_properties.get(module_name, {})
         if key in module_props:
             return module_props[key]
-        
+
         return set()
 
     def _set_module_predicate_properties(
         self, module_name: str, key: tuple[str, int], properties: set[str]
     ) -> None:
         """Set predicate properties for a specific module."""
-        if module_name not in self._module_predicate_properties:
-            self._module_predicate_properties[module_name] = {}
-        self._module_predicate_properties[module_name][key] = properties
+        self._module_predicate_properties.setdefault(module_name, {})[key] = properties
 
     def _get_module_predicate_sources(
         self, module_name: str, key: tuple[str, int]
     ) -> set[str]:
         """Get predicate sources for a specific module."""
-        module_sources = self._module_predicate_sources.get(module_name, {})
+        module_sources = self._module_predicate_sources.setdefault(module_name, {})
         return module_sources.get(key, set())
 
     def _add_module_predicate_source(
         self, module_name: str, key: tuple[str, int], source: str
     ) -> None:
         """Add a source to a predicate's source set in a specific module."""
-        if module_name not in self._module_predicate_sources:
-            self._module_predicate_sources[module_name] = {}
-        if key not in self._module_predicate_sources[module_name]:
-            self._module_predicate_sources[module_name][key] = set()
-        self._module_predicate_sources[module_name][key].add(source)
+        module_sources = self._module_predicate_sources.setdefault(module_name, {})
+        module_sources.setdefault(key, set()).add(source)
 
     def _extract_character(self, term: Any, context: str) -> str:
         """Extract a single character from a term for char_conversion.

@@ -1,7 +1,6 @@
 """Tests for module isolation - ensuring predicates can have same name/arity in different modules."""
 
 import pytest
-from pathlib import Path
 
 from vibeprolog import PrologInterpreter
 from vibeprolog.exceptions import PrologThrow
