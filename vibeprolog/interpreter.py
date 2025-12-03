@@ -50,12 +50,12 @@ class Module:
 class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
-def __init__(
-    self,
-    argv: list[str] | None = None,
-    max_recursion_depth: int = 10000,
-    builtin_conflict: str = "skip",
-) -> None:
+    def __init__(
+        self,
+        argv: list[str] | None = None,
+        max_recursion_depth: int = 10000,
+        builtin_conflict: str = "skip",
+    ) -> None:
         self.operator_table = OperatorTable()
         self.parser = PrologParser(self.operator_table)
         self._import_scanner_parser = PrologParser(OperatorTable())
