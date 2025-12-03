@@ -668,12 +668,18 @@ class PrologInterpreter:
         
         Declares attributes that can be used with put_atts/2 and get_atts/2
         in the current module.
+        
+        Note: Currently the declarations are stored but not validated against
+        at runtime. The put_atts/2 and get_atts/2 built-ins accept any attribute
+        names without checking if they were declared. This storage is provided
+        for future validation, tooling, and introspection purposes (e.g., a
+        linter or IDE could warn about undeclared attributes).
         """
         module_name = self.current_module
         
-        # Initialize declared attributes store if not present
+        # Store declarations for future validation/tooling - not currently enforced
         if not hasattr(self, '_declared_attributes'):
-            self._declared_attributes = {}
+            self._declared_attributes: dict[str, set[tuple[str, int]]] = {}
         if module_name not in self._declared_attributes:
             self._declared_attributes[module_name] = set()
         

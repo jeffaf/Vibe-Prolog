@@ -252,43 +252,38 @@ class AttributedUnificationContext:
 
         pending = []
         
-        # Case 1: Attributed variable unified with a non-variable value
-        if attvar1 and not isinstance(deref2, Variable):
-            # deref1 is an attvar being unified with value deref2
+        # Handle unification involving variables
+        if isinstance(deref1, Variable) and isinstance(deref2, Variable):
+            # Unification of two variables.
+            if attvar1 or attvar2:
+                # At least one is an attributed variable. The `unify` function binds
+                # the first variable argument to the second, so `deref1` is bound to `deref2`.
+                # We must merge attributes from `deref1` into `deref2`.
+                attrs1 = store.get(deref1.name, {})
+                attrs2 = store.get(deref2.name, {})
+
+                for k, val in attrs1.items():
+                    if k not in attrs2:
+                        attrs2[k] = val
+                
+                if attrs2:
+                    store[deref2.name] = attrs2
+                elif deref2.name in store:
+                    del store[deref2.name]
+
+                if deref1.name in store:
+                    del store[deref1.name]
+
+                # If both were attributed variables, verification hooks must be triggered for both.
+                if attvar1 and attvar2:
+                    pending.append((deref1, deref2))
+                    pending.append((deref2, deref1))
+        elif attvar1:
+            # Attributed variable `deref1` unified with a non-variable `deref2`.
             pending.append((deref1, deref2))
-        elif attvar2 and not isinstance(deref1, Variable):
-            # deref2 is an attvar being unified with value deref1
+        elif attvar2:
+            # Attributed variable `deref2` unified with a non-variable `deref1`.
             pending.append((deref2, deref1))
-        elif attvar1 and attvar2:
-            # Both are attributed variables - need to verify both
-            # The first variable's attributes need to be verified against the second variable
-            # and vice versa. We add both to pending for verify_attributes/3 hooks.
-            v1, v2 = deref1, deref2
-            attrs1 = store.get(v1.name, {})
-            attrs2 = store.get(v2.name, {})
-            
-            # Both attvars need verification - v1's attrs against v2, v2's attrs against v1
-            # After unification, one variable points to the other, so we verify both
-            pending.append((v1, v2))
-            pending.append((v2, v1))
-            
-            # Merge attributes onto the surviving variable (v1)
-            for k, val in attrs2.items():
-                if k not in attrs1:
-                    attrs1[k] = val
-            store[v1.name] = attrs1
-            if v2.name in store:
-                del store[v2.name]
-        elif attvar1 and isinstance(deref2, Variable):
-            # attvar unified with plain variable - check if variable gets bound
-            new_deref = deref(deref1, new_subst)
-            if not isinstance(new_deref, Variable):
-                pending.append((deref1, new_deref))
-        elif attvar2 and isinstance(deref1, Variable):
-            # attvar unified with plain variable - check if variable gets bound
-            new_deref = deref(deref2, new_subst)
-            if not isinstance(new_deref, Variable):
-                pending.append((deref2, new_deref))
         
         return new_subst, pending
 
