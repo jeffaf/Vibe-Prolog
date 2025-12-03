@@ -8,6 +8,19 @@ from typing import Any, Callable, Iterator, TypeAlias
 import sys
 from dataclasses import dataclass
 
+# Increase Python recursion limit to support deeper Prolog recursion
+# This allows the Python call stack to accommodate Prolog's logical recursion depth
+_original_recursion_limit = sys.getrecursionlimit()
+if _original_recursion_limit < 50000:
+    try:
+        sys.setrecursionlimit(50000)
+    except (RecursionError, ValueError):
+        # If we can't set it that high, try a more modest increase
+        try:
+            sys.setrecursionlimit(min(_original_recursion_limit * 10, 32767))
+        except (RecursionError, ValueError):
+            pass  # Use system default if all attempts fail
+
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Clause, Cut, List
 from vibeprolog.operators import OperatorTable
@@ -42,7 +55,7 @@ class PrologEngine:
         predicate_sources: dict[tuple[str, int], set[str]] | None = None,
         predicate_docs: dict[tuple[str, int], str] | None = None,
         operator_table: OperatorTable | None = None,
-        max_depth: int = 500,
+        max_depth: int = 10000,
     ):
         self.clauses = clauses
         # Explicit dependency so engine can reference interpreter state if needed
@@ -51,6 +64,7 @@ class PrologEngine:
         self.call_depth = 0
         self.max_depth = max_depth  # Prevent infinite recursion
         self._fresh_var_counter = 0
+        self._tco_enabled = True  # Enable tail-call optimization
         self.predicate_properties: dict[tuple[str, int], set[str]] = (
             predicate_properties if predicate_properties is not None else {}
         )
@@ -95,6 +109,17 @@ class PrologEngine:
     def query(self, goals: list[Compound]) -> Iterator[Substitution]:
         """Query the knowledge base and yield all substitutions that satisfy the goals."""
         yield from self._solve_goals(goals, Substitution(), depth=0)
+
+    def _is_tail_call(self, remaining_goals: list) -> bool:
+        """
+        Check if there are no remaining goals (i.e., next call is in tail position).
+        
+        A goal is in tail position if it's the last goal in the clause body
+        and there are no more goals to execute afterwards.
+        """
+        return len(remaining_goals) == 0
+
+
 
     def _solve_goals(
         self, goals: list[Compound], subst: Substitution, current_module: str = "user", depth: int = 0

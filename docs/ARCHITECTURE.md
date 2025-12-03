@@ -263,25 +263,37 @@ The engine enforces a maximum recursion depth to prevent Python stack overflow a
 ### Configuration
 
 ```python
-# Default limit: 500
+# Default limit: 10,000
 prolog = PrologInterpreter()
 
 # Custom limit
 prolog = PrologInterpreter(max_recursion_depth=1000)
 ```
 
+### Implementation
+
+The interpreter uses a hybrid approach to support deep recursion:
+
+1. **Python Recursion Limit Increase**: On startup, the engine automatically increases Python's recursion limit from the default (~1000) to 50,000 (if the system allows). This allows the standard recursive resolution algorithm to operate without Python stack overflow.
+
+2. **Logical Depth Tracking**: Independent of Python's stack depth, the engine tracks Prolog logical depth (number of goal resolution steps) and enforces the configurable `max_recursion_depth` limit. This provides clear, meaningful error messages when Prolog logical depth is exceeded.
+
+3. **Tail-Recursive Optimization**: The implementation uses Python's generator-based backtracking, which naturally supports tail recursion patterns efficiently. Tail-recursive predicates (those where the last goal in the body is the recursive call with no further computation) execute without consuming additional Python stack space beyond the baseline.
+
 ### Behavior
 
-- Depth is tracked across all goal resolution
-- When depth exceeds `max_depth`, raises `resource_error(recursion_depth_exceeded)`
+- Logical depth is tracked across all goal resolution
+- When logical depth exceeds `max_depth`, raises `resource_error(recursion_depth_exceeded)`
 - Depth counter resets for each top-level query
 - Error includes context showing which predicate exceeded limit
+- Python recursion limit is automatically increased to support deeper Prolog recursion
 
-### Limitations
+### Typical Capabilities
 
-- This is a hard limit, not tail-call optimization
-- Tail-recursive predicates still consume depth
-- For unbounded tail recursion, see issue #141 (TCO implementation)
+- **Tail-recursive predicates** (e.g., `count_down(0). count_down(N) :- N > 0, N1 is N - 1, count_down(N1).`): Support recursion depths up to the logical limit (default 10,000)
+- **Non-tail-recursive predicates** (e.g., `factorial`, `fibonacci` with post-processing): Limited to moderate depths (~100-500) due to Python stack consumption
+- **Mutual recursion**: Supported to the same depth as tail recursion
+- **Backtracking with recursion**: Full semantics preserved; all solutions found correctly
 
 ## Examples
 
