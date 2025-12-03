@@ -340,6 +340,11 @@ class PrologInterpreter:
             self.parser.set_char_conversion(from_char, to_char)
             return
 
+        # Handle attribute/1 directive for attributed variables
+        if isinstance(goal, Compound) and goal.functor == "attribute" and len(goal.args) == 1:
+            self._handle_attribute_directive(goal.args[0])
+            return
+
         # Handle supported directives
         if isinstance(goal, Compound) and goal.functor == "initialization" and len(goal.args) == 1:
             init_goal = goal.args[0]
@@ -654,6 +659,53 @@ class PrologInterpreter:
         self.current_module = saved_current_module
 
         return loaded_module_name
+
+    def _handle_attribute_directive(self, attr_spec) -> None:
+        """Handle :- attribute Name/Arity, ... directive.
+        
+        Declares attributes that can be used with put_atts/2 and get_atts/2
+        in the current module.
+        """
+        module_name = self.current_module
+        
+        # Initialize declared attributes store if not present
+        if not hasattr(self, '_declared_attributes'):
+            self._declared_attributes = {}
+        if module_name not in self._declared_attributes:
+            self._declared_attributes[module_name] = set()
+        
+        # Parse the attribute specification (can be single or comma-separated list)
+        attrs = self._parse_attribute_list(attr_spec)
+        
+        for name, arity in attrs:
+            self._declared_attributes[module_name].add((name, arity))
+
+    def _parse_attribute_list(self, attr_spec) -> list[tuple[str, int]]:
+        """Parse an attribute specification into a list of (name, arity) tuples.
+        
+        The spec can be:
+        - Name/Arity - single attribute
+        - (Attr1, Attr2, ...) - multiple attributes
+        """
+        result = []
+        
+        if isinstance(attr_spec, Compound) and attr_spec.functor == "," and len(attr_spec.args) == 2:
+            # Comma-separated list
+            result.extend(self._parse_attribute_list(attr_spec.args[0]))
+            result.extend(self._parse_attribute_list(attr_spec.args[1]))
+        elif isinstance(attr_spec, Compound) and attr_spec.functor == "/" and len(attr_spec.args) == 2:
+            # Single attribute Name/Arity
+            name_term, arity_term = attr_spec.args
+            if isinstance(name_term, Atom) and isinstance(arity_term, Number):
+                result.append((name_term.name, int(arity_term.value)))
+            else:
+                error_term = PrologError.type_error("attribute_indicator", attr_spec, "attribute/1")
+                raise PrologThrow(error_term)
+        else:
+            error_term = PrologError.type_error("attribute_indicator", attr_spec, "attribute/1")
+            raise PrologThrow(error_term)
+        
+        return result
 
     def _handle_predicate_property_directive(
         self, directive: PredicatePropertyDirective, closed_predicates: set[tuple[str, int]]
