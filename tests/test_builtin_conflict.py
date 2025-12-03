@@ -140,7 +140,7 @@ class TestBuiltinConflictShadowMode:
         """Within module clause bodies, unqualified calls should use the shadowing definition."""
         result = shadow_prolog.query_once("test_mod:test_length([a, b, c], L)")
         assert result is not None
-        assert result["L"] == 3
+        assert result["L"] == {'s': [{'s': [{'s': ['zero']}]}]}
 
     def test_shadow_mode_import_behavior(self):
         """Test import behavior with shadowed predicates."""
