@@ -4,6 +4,8 @@ import pytest
 import time
 from vibeprolog import PrologInterpreter
 from vibeprolog.exceptions import PrologThrow
+from vibeprolog.terms import Atom
+from vibeprolog.utils.list_utils import list_to_python
 
 
 class TestDeepTailRecursion:
@@ -132,7 +134,6 @@ class TestBacktrackingWithRecursion:
             my_member(X, [_|T]) :- my_member(X, T).
         """)
         results = list(prolog.query("my_member(X, [a, b, c, a])"))
-        from vibeprolog.terms import Atom
         values = []
         for r in results:
             term = r['X']
@@ -404,8 +405,6 @@ class TestComplexRecursivePatterns:
         """)
         result = prolog.query_once("build_list(20, X)")
         assert result is not None
-        from vibeprolog.utils.list_utils import list_to_python
-        from vibeprolog.terms import Atom
         # Handle both proper list and improper list with tail
         try:
             lst = list_to_python(result['X'], {})
