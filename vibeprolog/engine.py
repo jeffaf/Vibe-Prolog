@@ -315,7 +315,6 @@ class PrologEngine:
         var_ids: dict[int, int] = {}
 
         def _normalize(term: Any) -> Any:
-            term = deref(term, subst)
             if isinstance(term, Variable):
                 idx = var_ids.setdefault(id(term), len(var_ids))
                 return ("_", idx)
