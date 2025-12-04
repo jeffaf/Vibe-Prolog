@@ -942,8 +942,6 @@ class TestDotInParentheses:
 
     def test_dot_as_atom_argument(self):
         """Dot used as an atom argument inside compound term."""
-        from vibeprolog.parser import tokenize_prolog_statements
-
         code = 'phrase(upto_what(Bs0, .), Cs0, Ds).'
         statements = list(tokenize_prolog_statements(code))
         assert statements == ['phrase(upto_what(Bs0, .), Cs0, Ds).']
