@@ -1092,13 +1092,18 @@ class PrologInterpreter:
         # or from _process_items, or fall back to current_module)
         module_name = getattr(clause, "module", self.current_module)
 
+        # Check if module already exists before potentially creating it
+        module_existed = module_name in self.modules
+
         # Register clause under module if present
         self.modules.setdefault(module_name, Module(module_name, set()))
         mod = self.modules[module_name]
 
-        # If this is a cross-module definition (Module:Head), export the predicate
-        # so it can be called via module-qualified syntax
-        if is_cross_module_definition:
+        # If this is a cross-module definition (Module:Head) and the module was
+        # just created, export the predicate so it can be called. However, if
+        # the module already existed with a declared export list, respect that
+        # interface and don't auto-export (the module author controls exports).
+        if is_cross_module_definition and not module_existed:
             mod.exports.add(key)
 
         # Check if it's a built-in (global check)
