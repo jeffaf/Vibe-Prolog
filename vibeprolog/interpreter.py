@@ -161,9 +161,8 @@ class PrologInterpreter:
                 if directive_name in {"if", "else", "endif"}:
                     self._handle_directive(item, closed_predicates, source_name)
                     continue
-                if not self._is_conditionally_active():
-                    continue
-            elif not self._is_conditionally_active():
+
+            if not self._is_conditionally_active():
                 continue
 
             if isinstance(item, Clause):
