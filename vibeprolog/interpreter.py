@@ -1055,7 +1055,6 @@ class PrologInterpreter:
         """
 
         head = clause.head
-        target_module = None  # Will be set if head is module-qualified
 
         # Handle module-qualified clause heads (Module:Head :- Body)
         if isinstance(head, Compound) and head.functor == ":" and len(head.args) == 2:
@@ -1074,12 +1073,10 @@ class PrologInterpreter:
                     PrologError.type_error("atom", module_term, "consult/1")
                 )
 
-            # Valid atom module specifier
-            target_module = module_term.name
-            head = actual_head  # Use the actual head for key computation
-            # Modify the clause in-place to use the actual head
+            # Valid atom module specifier - modify clause in-place
+            head = actual_head
             clause.head = actual_head
-            clause.module = target_module
+            clause.module = module_term.name
 
         # Compute key from (possibly updated) head
         if isinstance(head, Compound):
@@ -1089,13 +1086,9 @@ class PrologInterpreter:
         else:
             return last_predicate
 
-        # Get the module for this clause
-        # If target_module was set from module-qualified head, use it
-        # Otherwise use the clause's module attribute or current_module
-        if target_module is not None:
-            module_name = target_module
-        else:
-            module_name = getattr(clause, "module", self.current_module)
+        # Get the module for this clause (set above for module-qualified heads,
+        # or from _process_items, or fall back to current_module)
+        module_name = getattr(clause, "module", self.current_module)
 
         # Register clause under module if present
         self.modules.setdefault(module_name, Module(module_name, set()))
