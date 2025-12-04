@@ -246,13 +246,12 @@ class PrologInterpreter:
         if not isinstance(item, Directive):
             return False
         goal = item.goal
-        if isinstance(goal, Compound) and goal.functor == "if" and len(goal.args) == 1:
-            return True
-        if isinstance(goal, Compound) and goal.functor == "elif" and len(goal.args) == 1:
-            return True
-        if isinstance(goal, Atom) and goal.name in ("else", "endif"):
-            return True
+        if isinstance(goal, Compound) and len(goal.args) == 1:
+            return goal.functor in ("if", "elif")
+        if isinstance(goal, Atom):
+            return goal.name in ("else", "endif")
         return False
+
 
     def _process_items(
         self,
