@@ -1266,6 +1266,7 @@ class PrologInterpreter:
                     "consult/1",
                     apply_char_conversions=not is_char_conversion,
                     directive_ops=directive_ops,
+                    module_name=self.current_module,
                 )
             except (ValueError, LarkError) as exc:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")
@@ -1447,7 +1448,14 @@ class PrologInterpreter:
         prolog_code = f"dummy :- {query_str}"
         try:
             # Don't apply char conversions to interactive queries
-            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
+            # Use "user" module context for top-level queries - module-scoped
+            # operators in other modules should not affect user queries
+            clauses = self.parser.parse(
+                prolog_code,
+                "query/1",
+                apply_char_conversions=False,
+                module_name="user",
+            )
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
 
@@ -1459,7 +1467,13 @@ class PrologInterpreter:
         prolog_code = query_str
         try:
             # Don't apply char conversions to interactive queries
-            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
+            # Use "user" module context for top-level queries
+            clauses = self.parser.parse(
+                prolog_code,
+                "query/1",
+                apply_char_conversions=False,
+                module_name="user",
+            )
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
         if clauses:

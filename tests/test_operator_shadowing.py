@@ -166,23 +166,12 @@ class TestLibraryCompatibility:
     def test_can_load_iso_ext_with_shadow_mode(self):
         """library/iso_ext.pl should load with shadow mode."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
-        try:
-            prolog.consult_string(":- use_module(library(iso_ext)).")
-        except PrologThrow as e:
-            error_str = str(e)
-            # Should not fail with permission_error on operator
-            assert "permission_error" not in error_str or "operator" not in error_str
+        prolog.consult_string(":- use_module(library(iso_ext)).")
 
     def test_can_load_dcgs_with_shadow_mode(self):
         """library/dcgs.pl should load with shadow mode."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
-        try:
-            prolog.consult_string(":- use_module(library(dcgs)).")
-        except PrologThrow as e:
-            error_str = str(e)
-            # Should not fail with permission_error on operator
-            if "permission_error" in error_str and "operator" in error_str:
-                pytest.fail(f"Should not fail with operator permission_error: {e}")
+        prolog.consult_string(":- use_module(library(dcgs)).")
 
 
 class TestOperatorTableMethods:
@@ -318,3 +307,107 @@ class TestOperatorShadowingEdgeCases:
         result = prolog.query_once("test_mod:test_list(L)")
         assert result is not None
         assert result["L"] == [1, 2, 3]
+
+
+class TestModuleScopedOperatorParsing:
+    """Tests that module-scoped operators are recognized during parsing."""
+
+    def test_parser_uses_module_scoped_operator_during_consult(self):
+        """Parser should use module-scoped operators when parsing module content.
+
+        This test verifies that during consult, module-scoped operators are
+        correctly used to parse code within that module.
+        """
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        # Define a module that uses | as an infix operator in clause heads
+        # The get_pipe_args/3 predicate uses pattern matching with | operator
+        prolog.consult_string("""
+            :- module(clp_test, [get_pipe_args/3]).
+            :- op(700, xfx, '|').
+            get_pipe_args(X | Y, X, Y).
+        """)
+        # Query the predicate with a compound term built using functor '|'
+        # We use the '|'/2 functor directly to avoid query parsing issues
+        result = prolog.query_once("clp_test:get_pipe_args('|'(a, b), A, B)")
+        assert result is not None
+        assert result["A"] == "a"
+        assert result["B"] == "b"
+
+    def test_module_operator_in_clause_body(self):
+        """Module-scoped operators should work in clause bodies during consult."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        prolog.consult_string("""
+            :- module(pipe_mod, [make_pipe/3]).
+            :- op(700, xfx, '|').
+            make_pipe(X, Y, X | Y).
+        """)
+        # Call the predicate and verify it creates a compound with | functor
+        result = prolog.query_once("pipe_mod:make_pipe(foo, bar, R)")
+        assert result is not None
+        # The result should be a compound term with functor '|'
+        # The Python representation is {functor: [args...]}
+        assert result["R"] == {"|": ["foo", "bar"]}
+
+    def test_parser_module_operator_different_precedence(self):
+        """Module can define operator with different precedence than global."""
+        prolog = PrologInterpreter(builtin_conflict="shadow")
+        # Define a custom operator in module with unusual precedence
+        prolog.consult_string("""
+            :- module(custom_ops, [use_op/1]).
+            :- op(300, xfy, '@@').
+            use_op(X) :- X = (1 @@ 2 @@ 3).
+        """)
+        result = prolog.query_once("custom_ops:use_op(X)")
+        assert result is not None
+        # Should parse as right-associative @@
+
+    def test_iter_operators_for_module_combines_global_and_module(self):
+        """iter_operators_for_module should combine global and module operators."""
+        from vibeprolog.operators import OperatorTable
+        from vibeprolog.terms import Atom, Number
+
+        table = OperatorTable(builtin_conflict="shadow")
+        # Add a module-scoped operator for a protected operator
+        table.define(Number(700), Atom("xfx"), Atom("|"), "test", module_name="my_mod")
+
+        # The global table should have the default operators
+        global_ops = list(table.iter_current_ops())
+        assert len(global_ops) > 0
+
+        # Module-scoped iteration should include both global and module ops
+        mod_ops = list(table.iter_operators_for_module("my_mod"))
+        mod_op_names = [name for name, _ in mod_ops]
+
+        # Should include standard operators
+        assert "+" in mod_op_names
+        assert "-" in mod_op_names
+
+        # Should include the shadowed pipe operator
+        assert "|" in mod_op_names
+
+        # The pipe operator should have the module-scoped precedence
+        pipe_info = None
+        for name, info in mod_ops:
+            if name == "|" and info.spec == "xfx":
+                pipe_info = info
+                break
+        assert pipe_info is not None
+        assert pipe_info.precedence == 700
+
+    def test_iter_operators_for_module_none_returns_global(self):
+        """iter_operators_for_module(None) should return only global operators."""
+        from vibeprolog.operators import OperatorTable
+        from vibeprolog.terms import Atom, Number
+
+        table = OperatorTable(builtin_conflict="shadow")
+        # Add a module-scoped operator
+        table.define(Number(700), Atom("xfx"), Atom("|"), "test", module_name="my_mod")
+
+        # None module should not include module-scoped operators
+        global_ops = list(table.iter_operators_for_module(None))
+        global_op_dict = {(name, info.spec): info for name, info in global_ops}
+
+        # Pipe might not be in global table or might have default precedence
+        if ("|", "xfx") in global_op_dict:
+            # If it exists, it should NOT be 700 (the module-scoped value)
+            assert global_op_dict[("|", "xfx")].precedence != 700

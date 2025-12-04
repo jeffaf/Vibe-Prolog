@@ -229,9 +229,7 @@ class OperatorTable:
 
         self._table[key] = OperatorInfo(precedence_value, spec)
         if module_name is not None:
-            if module_name not in self._module_operators:
-                self._module_operators[module_name] = {}
-            self._module_operators[module_name][key] = OperatorInfo(
+            self._module_operators.setdefault(module_name, {})[key] = OperatorInfo(
                 precedence_value, spec
             )
 
@@ -245,6 +243,33 @@ class OperatorTable:
             Dictionary mapping (name, spec) to OperatorInfo for this module
         """
         return self._module_operators.get(module_name, {})
+
+    def iter_operators_for_module(
+        self, module_name: str | None
+    ) -> Iterable[Tuple[str, OperatorInfo]]:
+        """Iterate over operators visible in a given module context.
+
+        This combines global operators with module-scoped operators (shadows).
+        Module-scoped operators take precedence over global ones.
+
+        Args:
+            module_name: The module context, or None for global-only operators
+
+        Yields:
+            Tuples of (name, OperatorInfo) for all visible operators
+        """
+        # Start with global operators
+        combined: dict[tuple[str, str], OperatorInfo] = dict(self._table)
+
+        # Overlay module-scoped operators if a module is specified
+        if module_name is not None and module_name in self._module_operators:
+            for key, info in self._module_operators[module_name].items():
+                combined[key] = info
+
+        for (name, _), info in sorted(
+            combined.items(), key=lambda item: (item[1].precedence, item[0])
+        ):
+            yield name, info
 
     def is_shadowed(self, module_name: str, name: str, spec: str) -> bool:
         """Check if an operator is shadowed in a given module.
