@@ -7,6 +7,8 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+from vibeprolog.utils.term_utils import term_to_string
+
 from lark.exceptions import LarkError
 
 from vibeprolog.exceptions import PrologError, PrologThrow
@@ -198,20 +200,17 @@ class PrologInterpreter:
         """Handle a directive."""
         goal = directive.goal
 
-        # Check for ignored directives (Scryer-specific directives we don't support)
-        directive_name = None
-        if isinstance(goal, Compound) and goal.functor in IGNORED_DIRECTIVES:
-            directive_name = goal.functor
-        elif isinstance(goal, Atom) and goal.name in IGNORED_DIRECTIVES:
-            directive_name = goal.name
-        
+        # Simplify ignored directive detection
+        functor = None
+        if isinstance(goal, Compound):
+            functor = goal.functor
+        elif isinstance(goal, Atom):
+            functor = goal.name
+
+        directive_name = functor if functor in IGNORED_DIRECTIVES else None
+
         if directive_name is not None:
-            from vibeprolog.utils.term_utils import term_to_string
-            goal_str = term_to_string(goal)
-            warnings.warn(
-                f"Ignoring unsupported directive: {goal_str}",
-                stacklevel=2
-            )
+            # Ignore unsupported directives
             return
 
         # Module declaration: :- module(Name, Exports).
