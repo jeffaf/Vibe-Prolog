@@ -3,8 +3,11 @@
 import io
 import re
 import sys
+import warnings
 from pathlib import Path
 from typing import Any
+
+from vibeprolog.utils.term_utils import term_to_string
 
 from lark.exceptions import LarkError
 
@@ -34,6 +37,9 @@ LIBRARY_SEARCH_PATHS = [
     PROJECT_ROOT / "examples" / "modules",
 ]
 LOADED_MODULE_PREFIX = "loaded:"
+
+# Scryer-specific directives that are recognized but ignored with a warning
+IGNORED_DIRECTIVES = {"non_counted_backtracking", "meta_predicate"}
 
 
 class Module:
@@ -193,6 +199,24 @@ class PrologInterpreter:
     ):
         """Handle a directive."""
         goal = directive.goal
+
+        # Simplify ignored directive detection
+        functor = None
+        if isinstance(goal, Compound):
+            functor = goal.functor
+        elif isinstance(goal, Atom):
+            functor = goal.name
+
+        directive_name = functor if functor in IGNORED_DIRECTIVES else None
+
+        if directive_name is not None:
+            # Emit warning and ignore unsupported directives
+            warnings.warn(
+                f"Ignoring unsupported directive: {directive_name}",
+                SyntaxWarning,
+                stacklevel=2
+            )
+            return
 
         # Module declaration: :- module(Name, Exports).
         if isinstance(goal, Compound) and goal.functor == "module" and len(goal.args) == 2:
