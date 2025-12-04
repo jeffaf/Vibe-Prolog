@@ -52,23 +52,10 @@ class TestCLI:
         # Should not have multiple solutions
         assert " ;" not in result.stdout
 
-    def test_interactive_with_quit_command(self):
-        """Test interactive mode with quit command."""
-        result = self.run_cli([], input_text="quit.\n")
-
-        assert result.returncode == 0
-        assert "Goodbye!" in result.stdout
-
-    def test_interactive_with_exit_command(self):
-        """Test interactive mode with exit command."""
-        result = self.run_cli([], input_text="exit.\n")
-
-        assert result.returncode == 0
-        assert "Goodbye!" in result.stdout
-
-    def test_interactive_with_halt_command(self):
-        """Test interactive mode with halt command."""
-        result = self.run_cli([], input_text="halt.\n")
+    @pytest.mark.parametrize("exit_command", ["quit.", "exit.", "halt.", "quit", "exit", "halt"])
+    def test_interactive_with_exit_commands(self, exit_command):
+        """Test interactive mode with various exit commands."""
+        result = self.run_cli([], input_text=f"{exit_command}\n")
 
         assert result.returncode == 0
         assert "Goodbye!" in result.stdout
