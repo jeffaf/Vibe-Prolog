@@ -398,49 +398,19 @@ class PrologInterpreter:
                         names = self.operator_table._parse_operator_names(name_term, "module/2")
                         for name in names:
                             exported_operators.add((precedence, spec, name))
-                    # Handle DCG indicator Name//Arity (SWI-Prolog extension)
-                    # The "//" is parsed as a compound with functor "//"
+                    # Refactor DCG (//) and predicate indicator handling into a shared path
+                    # Handle DCG indicator and / indicator using a common helper to reduce duplication
                     elif isinstance(elt, Compound) and elt.functor == "//" and len(elt.args) == 2:
                         name_arg, arity_arg = elt.args
-                        normalized_name = self._normalize_operator_in_indicator(name_arg)
-                        if isinstance(normalized_name, Atom) and isinstance(arity_arg, Number) and normalized_name.name in CONTROL_CONSTRUCT_NAMES:
-                            # Skip control constructs (ISO does not allow them in predicate indicators)
-                            warnings.warn(
-                                f"Skipping invalid predicate indicator in module export: {normalized_name.name}//{arity_arg.value}",
-                                SyntaxWarning,
-                                stacklevel=2
-                            )
-                        elif isinstance(normalized_name, Atom) and isinstance(arity_arg, Number) and int(arity_arg.value) + 2 >= 0:
-                            # DCG predicates get +2 to their arity when expanded
-                            # Export the expanded form
-                            exports.add((normalized_name.name, int(arity_arg.value) + 2))
-                        else:
-                            # Skip invalid predicate indicators with a warning
-                            warnings.warn(
-                                f"Skipping invalid predicate indicator in module export: {term_to_string(elt)}",
-                                SyntaxWarning,
-                                stacklevel=2
-                            )
+                        result = self._export_predicate_indicator(name_arg, arity_arg, is_dcg=True, elt=elt)
+                        if isinstance(result, tuple):
+                            exports.add(result)
                     # Each elt should be Name/Arity (Compound "/") or op/3
                     elif isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
                         name_arg, arity_arg = elt.args
-                        normalized_name = self._normalize_operator_in_indicator(name_arg)
-                        if isinstance(normalized_name, Atom) and isinstance(arity_arg, Number) and normalized_name.name in CONTROL_CONSTRUCT_NAMES:
-                            # Skip control constructs (ISO does not allow them in predicate indicators)
-                            warnings.warn(
-                                f"Skipping invalid predicate indicator in module export: {normalized_name.name}/{arity_arg.value}",
-                                SyntaxWarning,
-                                stacklevel=2
-                            )
-                        elif isinstance(normalized_name, Atom) and isinstance(arity_arg, Number) and arity_arg.value >= 0:
-                            exports.add((normalized_name.name, int(arity_arg.value)))
-                        else:
-                            # Skip invalid predicate indicators with a warning
-                            warnings.warn(
-                                f"Skipping invalid predicate indicator in module export: {term_to_string(elt)}",
-                                SyntaxWarning,
-                                stacklevel=2
-                            )
+                        result = self._export_predicate_indicator(name_arg, arity_arg, is_dcg=False, elt=elt)
+                        if isinstance(result, tuple):
+                            exports.add(result)
                     else:
                         # Skip invalid predicate indicators (e.g., control constructs like !/0)
                         # with a warning for Scryer compatibility
@@ -531,6 +501,43 @@ class PrologInterpreter:
             return
 
         # Reject unsupported directives
+    def _export_predicate_indicator(self, name_arg, arity_arg, is_dcg: bool, elt=None):
+        """
+        Normalize and validate a predicate indicator for module exports.
+        Returns a tuple (name, arity) to export or None if skipped.
+        Handles both DCG (//) and standard (/) forms via is_dcg flag.
+        """
+        normalized_name = self._normalize_operator_in_indicator(name_arg)
+        # Validate types: Name must be Atom, Arity must be Number
+        if isinstance(normalized_name, Atom) and isinstance(arity_arg, Number):
+            arity = int(arity_arg.value)
+            # Non-negative arity check (both DCG and standard)
+            if arity < 0:
+                warnings.warn(
+                    f"Skipping invalid predicate indicator with negative arity: {normalized_name.name}{'//' if is_dcg else '/'}{arity}",
+                    SyntaxWarning,
+                    stacklevel=2
+                )
+                return None
+            # Skip control constructs if present (ISO restriction)
+            if normalized_name.name in CONTROL_CONSTRUCT_NAMES:
+                warnings.warn(
+                    f"Skipping invalid predicate indicator in module export: {normalized_name.name}{'//' if is_dcg else '/'}{arity}",
+                    SyntaxWarning,
+                    stacklevel=2
+                )
+                return None
+            # Compute export arity: DCG adds 2 to arity
+            export_arity = arity + (2 if is_dcg else 0)
+            return (normalized_name.name, export_arity)
+        else:
+            # Invalid shape (Name/Arity not formed properly)
+            warnings.warn(
+                f"Skipping invalid predicate indicator in module export: {term_to_string(elt) if elt is not None else name_arg}",
+                SyntaxWarning,
+                stacklevel=2
+            )
+            return None
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
             prec_term, spec_term, name_term = goal.args
             self.operator_table.define(prec_term, spec_term, name_term, "op/3")
@@ -1045,6 +1052,7 @@ class PrologInterpreter:
         if reconstructed is not None:
             return Atom(reconstructed)
         return term
+
 
     def _indicator_from_key(self, key: tuple[str, int]) -> Compound:
         name, arity = key
