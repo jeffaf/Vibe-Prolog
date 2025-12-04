@@ -913,9 +913,9 @@ class PrologInterpreter:
                 condition_succeeded = self._evaluate_condition(condition)
             except PrologThrow:
                 raise
-            except Exception:
+            except Exception as e:
                 error_term = PrologError.evaluation_error("error", "if/1")
-                raise PrologThrow(error_term)
+                raise PrologThrow(error_term) from e
 
             self._conditional_stack.append((condition_succeeded, False))
             return
