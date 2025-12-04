@@ -828,10 +828,6 @@ class TestISOParserEdgeCases:
         assert result is not None
         assert result['X'] == 1
 
-    @pytest.mark.skip(reason="Character code syntax 0'\\\\' requires complex lexer tokenization. "
-                      "The CHAR_CODE regex cannot properly distinguish between 0'\\\\ (backslash) "
-                      "and the start of a string literal '\\\\'  in all contexts. This is an "
-                      "extremely obscure ISO Prolog edge case rarely used in practice.")
     def test_character_codes(self):
         # Conformity: test_114, test_115, test_116
         prolog = PrologInterpreter()

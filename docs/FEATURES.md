@@ -62,6 +62,9 @@ Status legend:
 | `:- discontiguous/1`   | ✅      |                                          |
 | `:- initialization/1`  | ✅      |                                          |
 | `:- op/3`              | ✅      | Full support - defines operators with validation |
+| `:- if/1`              | ✅      | Conditional compilation - begin block    |
+| `:- else/0`            | ✅      | Conditional compilation - alternative block |
+| `:- endif/0`           | ✅      | Conditional compilation - end block      |
 | `:- char_conversion/2` | ✅      | **ISO-required** - Character conversion during parsing |
 
 ### Ignored Directives (Scryer-Prolog Specific)

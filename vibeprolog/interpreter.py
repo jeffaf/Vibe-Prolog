@@ -96,6 +96,8 @@ class PrologInterpreter:
         # Cleared when the interpreter instance is destroyed.
         self._import_operator_cache: dict[str, list[tuple[int, str, str]]] = {}
         self._current_source_path: Path | None = None
+        # Stack of (is_active, has_seen_else) tuples for conditional compilation directives
+        self._conditional_stack: list[tuple[bool, bool]] = []
 
     @property
     def argv(self) -> list[str]:
@@ -154,6 +156,16 @@ class PrologInterpreter:
             closed_predicates = set()
 
         for item in items:
+            if isinstance(item, Directive):
+                directive_name = self._get_directive_name(item.goal)
+                if directive_name in {"if", "else", "endif"}:
+                    self._handle_directive(item, closed_predicates, source_name)
+                    continue
+                if not self._is_conditionally_active():
+                    continue
+            elif not self._is_conditionally_active():
+                continue
+
             if isinstance(item, Clause):
                 # Expand DCG clauses before adding
                 if item.dcg:
@@ -206,6 +218,10 @@ class PrologInterpreter:
             functor = goal.functor
         elif isinstance(goal, Atom):
             functor = goal.name
+
+        if functor in {"if", "else", "endif"}:
+            self._handle_conditional_directive(goal)
+            return
 
         directive_name = functor if functor in IGNORED_DIRECTIVES else None
 
@@ -838,6 +854,92 @@ class PrologInterpreter:
         name, arity = key
         return Compound("/", (Atom(name), Number(arity)))
 
+    def _get_directive_name(self, goal: Any) -> str | None:
+        """Return the functor/name for a directive goal, if available."""
+        if isinstance(goal, Compound):
+            return goal.functor
+        if isinstance(goal, Atom):
+            return goal.name
+        return None
+
+    def _is_conditionally_active(self) -> bool:
+        """True if all enclosing conditional blocks are active."""
+        return all(is_active for is_active, _ in self._conditional_stack)
+
+    def _evaluate_condition(self, condition: Any) -> bool:
+        """Evaluate a conditional compilation guard."""
+        temp_engine = PrologEngine(
+            self.clauses,
+            self.argv,
+            self.predicate_properties,
+            self._predicate_sources,
+            self.predicate_docs,
+            operator_table=self.operator_table,
+            max_depth=self.max_recursion_depth,
+        )
+        temp_engine.interpreter = self
+        temp_engine.current_module = self.current_module
+
+        solutions = temp_engine._solve_goals(
+            [condition], Substitution(), current_module=self.current_module
+        )
+        try:
+            next(solutions)
+            return True
+        except StopIteration:
+            return False
+
+    def _handle_conditional_directive(self, goal: Any) -> None:
+        """Process :- if/1, :- else, :- endif directives."""
+        name = self._get_directive_name(goal)
+
+        if name == "if":
+            if not isinstance(goal, Compound) or len(goal.args) != 1:
+                error_term = PrologError.type_error("callable", goal, "if/1")
+                raise PrologThrow(error_term)
+
+            if not self._is_conditionally_active():
+                self._conditional_stack.append((False, False))
+                return
+
+            condition = goal.args[0]
+            if isinstance(condition, Variable):
+                error_term = PrologError.instantiation_error("if/1")
+                raise PrologThrow(error_term)
+            if not isinstance(condition, (Compound, Atom)):
+                error_term = PrologError.type_error("callable", condition, "if/1")
+                raise PrologThrow(error_term)
+
+            try:
+                condition_succeeded = self._evaluate_condition(condition)
+            except PrologThrow:
+                raise
+            except Exception:
+                error_term = PrologError.evaluation_error("error", "if/1")
+                raise PrologThrow(error_term)
+
+            self._conditional_stack.append((condition_succeeded, False))
+            return
+
+        if name == "else":
+            if not self._conditional_stack:
+                error_term = PrologError.syntax_error("else_without_if", "consult/1")
+                raise PrologThrow(error_term)
+
+            is_active, has_seen_else = self._conditional_stack.pop()
+            if has_seen_else:
+                error_term = PrologError.syntax_error("multiple_else", "consult/1")
+                raise PrologThrow(error_term)
+
+            self._conditional_stack.append((not is_active, True))
+            return
+
+        if name == "endif":
+            if not self._conditional_stack:
+                error_term = PrologError.syntax_error("endif_without_if", "consult/1")
+                raise PrologThrow(error_term)
+            self._conditional_stack.pop()
+
     def _get_module_predicate_properties(
         self, module_name: str, key: tuple[str, int]
     ) -> set[str]:
@@ -998,65 +1100,74 @@ class PrologInterpreter:
         # Ensure a default user module exists
         self.modules.setdefault("user", Module("user", None))
         self._current_source_path = self._source_path_from_name(source_name)
+        self._conditional_stack = []
 
         try:
-            local_directives = extract_op_directives(prolog_code)
-            imported_ops = self._collect_imported_operators(
-                prolog_code, source_name, local_directives
-            )
-            directive_ops = imported_ops + local_directives
-        except ValueError as exc:
-            error_term = PrologError.syntax_error(str(exc), "consult/1")
-            raise PrologThrow(error_term)
-
-        # Parse and process incrementally to support char_conversion taking effect
-        # between clauses/directives. We split by period-terminated statements.
-        all_items = []
-        try:
-            chunks = self._split_clauses(prolog_code)
-        except ValueError as exc:
-            error_term = PrologError.syntax_error(str(exc), "consult/1")
-            raise PrologThrow(error_term)
-        
-        # Keep closed_predicates across chunks to enforce discontiguous requirements
-        closed_predicates: set[tuple[str, int]] = set()
-        last_predicate: tuple[str, int] | None = None
-        
-        for chunk in chunks:
-            chunk = chunk.strip()
-            if not chunk:
-                continue
             try:
-                # char_conversion directives should not be affected by char conversions
-                # since they need to be parsed as-is to set the conversions
-                is_char_conversion = re.match(r"\s*:-\s*char_conversion\b", chunk)
-                items = self.parser.parse(
-                    chunk,
-                    "consult/1",
-                    apply_char_conversions=not is_char_conversion,
-                    directive_ops=directive_ops,
+                local_directives = extract_op_directives(prolog_code)
+                imported_ops = self._collect_imported_operators(
+                    prolog_code, source_name, local_directives
                 )
-            except (ValueError, LarkError) as exc:
+                directive_ops = imported_ops + local_directives
+            except ValueError as exc:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")
                 raise PrologThrow(error_term)
-            # Process each item immediately so char_conversion directives
-            # take effect before subsequent parsing
-            last_predicate = self._process_items(items, source_name, closed_predicates, last_predicate)
-            all_items.extend(items)
 
-        self.engine = PrologEngine(
-            self.clauses,
-            self.argv,
-            self.predicate_properties,
-            self._predicate_sources,
-            self.predicate_docs,
-            operator_table=self.operator_table,
-            max_depth=self.max_recursion_depth,
-        )
-        # Expose interpreter to engine for module-aware resolution
-        self.engine.interpreter = self
-        self._execute_initialization_goals()
-        self._current_source_path = None
+            # Parse and process incrementally to support char_conversion taking effect
+            # between clauses/directives. We split by period-terminated statements.
+            all_items = []
+            try:
+                chunks = self._split_clauses(prolog_code)
+            except ValueError as exc:
+                error_term = PrologError.syntax_error(str(exc), "consult/1")
+                raise PrologThrow(error_term)
+            
+            # Keep closed_predicates across chunks to enforce discontiguous requirements
+            closed_predicates: set[tuple[str, int]] = set()
+            last_predicate: tuple[str, int] | None = None
+            
+            for chunk in chunks:
+                chunk = chunk.strip()
+                if not chunk:
+                    continue
+                try:
+                    # char_conversion directives should not be affected by char conversions
+                    # since they need to be parsed as-is to set the conversions
+                    is_char_conversion = re.match(r"\s*:-\s*char_conversion\b", chunk)
+                    items = self.parser.parse(
+                        chunk,
+                        "consult/1",
+                        apply_char_conversions=not is_char_conversion,
+                        directive_ops=directive_ops,
+                    )
+                except (ValueError, LarkError) as exc:
+                    error_term = PrologError.syntax_error(str(exc), "consult/1")
+                    raise PrologThrow(error_term)
+                # Process each item immediately so char_conversion directives
+                # take effect before subsequent parsing
+                last_predicate = self._process_items(items, source_name, closed_predicates, last_predicate)
+                all_items.extend(items)
+
+            if self._conditional_stack:
+                error_term = PrologError.syntax_error("unclosed_if_directive", "consult/1")
+                raise PrologThrow(error_term)
+
+            self.engine = PrologEngine(
+                self.clauses,
+                self.argv,
+                self.predicate_properties,
+                self._predicate_sources,
+                self.predicate_docs,
+                operator_table=self.operator_table,
+                max_depth=self.max_recursion_depth,
+            )
+            # Expose interpreter to engine for module-aware resolution
+            self.engine.interpreter = self
+            self._execute_initialization_goals()
+            self._current_source_path = None
+        finally:
+            self._conditional_stack = []
+            self._current_source_path = None
 
     def _split_clauses(self, prolog_code: str) -> list[str]:
         """Split Prolog code into individual clause/directive strings.
