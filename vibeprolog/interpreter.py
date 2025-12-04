@@ -65,9 +65,9 @@ class PrologInterpreter:
         max_recursion_depth: int = 10000,
         builtin_conflict: str = "skip",
     ) -> None:
-        self.operator_table = OperatorTable()
+        self.operator_table = OperatorTable(builtin_conflict=builtin_conflict)
         self.parser = PrologParser(self.operator_table)
-        self._import_scanner_parser = PrologParser(OperatorTable())
+        self._import_scanner_parser = PrologParser(OperatorTable(builtin_conflict=builtin_conflict))
         self.clauses = []
         # Module system
         self.modules: dict[str, "Module"] = {}
@@ -481,7 +481,13 @@ class PrologInterpreter:
                 # Import all exported operators (full import only)
                 for op_def in source_mod.exported_operators:
                     precedence, spec, name = op_def
-                    self.operator_table.define(Number(precedence), Atom(spec), Atom(name), "use_module/1")
+                    self.operator_table.define(
+                        Number(precedence),
+                        Atom(spec),
+                        Atom(name),
+                        "use_module/1",
+                        module_name=self.current_module,
+                    )
             else:
                 # Import specific predicates (operators not imported in selective import)
                 for pred_key in imports:
@@ -501,7 +507,13 @@ class PrologInterpreter:
         # Reject unsupported directives
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
             prec_term, spec_term, name_term = goal.args
-            self.operator_table.define(prec_term, spec_term, name_term, "op/3")
+            self.operator_table.define(
+                prec_term,
+                spec_term,
+                name_term,
+                "op/3",
+                module_name=self.current_module,
+            )
             return
 
         # Handle char_conversion/2 directive
