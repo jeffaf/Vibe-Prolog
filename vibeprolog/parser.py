@@ -205,7 +205,6 @@ __OPERATOR_GRAMMAR__
     %import common.WS
     %ignore WS
     %ignore /%.*/  // Line comments
-    %ignore /\/\*[\s\S]*?\*\//  // Block comments
 """
 
 
