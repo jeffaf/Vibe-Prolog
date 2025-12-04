@@ -210,7 +210,12 @@ class PrologInterpreter:
         directive_name = functor if functor in IGNORED_DIRECTIVES else None
 
         if directive_name is not None:
-            # Ignore unsupported directives
+            # Emit warning and ignore unsupported directives
+            warnings.warn(
+                f"Ignoring unsupported directive: {directive_name}",
+                SyntaxWarning,
+                stacklevel=2
+            )
             return
 
         # Module declaration: :- module(Name, Exports).
