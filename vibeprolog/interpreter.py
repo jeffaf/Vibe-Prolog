@@ -1047,9 +1047,37 @@ class PrologInterpreter:
         closed_predicates: set[tuple[str, int]],
         last_predicate: tuple[str, int] | None,
     ) -> tuple[str, int] | None:
-        """Insert a clause while enforcing predicate properties."""
+        """Insert a clause while enforcing predicate properties.
+
+        Supports module-qualified clause heads like `Module:Head :- Body`.
+        When the head is a `:/2` compound, the clause is added to the
+        specified module rather than the current module.
+        """
 
         head = clause.head
+        target_module = None  # Will be set if head is module-qualified
+
+        # Handle module-qualified clause heads (Module:Head :- Body)
+        if isinstance(head, Compound) and head.functor == ":" and len(head.args) == 2:
+            module_term = head.args[0]
+            actual_head = head.args[1]
+
+            # Module must be an atom
+            if isinstance(module_term, Atom):
+                target_module = module_term.name
+                head = actual_head  # Use the actual head for key computation
+                # Create a new clause with the actual head (without module qualification)
+                clause = Clause(
+                    head=actual_head,
+                    body=clause.body,
+                    doc=getattr(clause, "doc", None),
+                    meta=getattr(clause, "meta", None),
+                    dcg=getattr(clause, "dcg", False),
+                )
+                # Set the module attribute on the new clause
+                clause.module = target_module
+
+        # Compute key from (possibly updated) head
         if isinstance(head, Compound):
             key = (head.functor, len(head.args))
         elif isinstance(head, Atom):
@@ -1058,7 +1086,12 @@ class PrologInterpreter:
             return last_predicate
 
         # Get the module for this clause
-        module_name = getattr(clause, "module", self.current_module)
+        # If target_module was set from module-qualified head, use it
+        # Otherwise use the clause's module attribute or current_module
+        if target_module is not None:
+            module_name = target_module
+        else:
+            module_name = getattr(clause, "module", self.current_module)
 
         # Register clause under module if present
         self.modules.setdefault(module_name, Module(module_name, set()))
