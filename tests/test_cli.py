@@ -4,7 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 import pytest
-import tempfile
 import os
 
 
@@ -60,35 +59,25 @@ class TestCLI:
         assert result.returncode == 0
         assert "Goodbye!" in result.stdout
 
-    def test_query_with_file_still_works(self):
+    def test_query_with_file_still_works(self, tmp_path):
         """Test that loading a file and executing a query still works."""
-        # Create a temporary Prolog file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pl', delete=False) as f:
-            f.write("test_pred(a).\ntest_pred(b).\n")
-            temp_file = f.name
+        prolog_file = tmp_path / "test.pl"
+        prolog_file.write_text("test_pred(a).\ntest_pred(b).\n")
 
-        try:
-            result = self.run_cli([temp_file, "-q", "test_pred(X)"])
+        result = self.run_cli([str(prolog_file), "-q", "test_pred(X)"])
 
-            assert result.returncode == 0
-            assert "X = a" in result.stdout or "X = a ;" in result.stdout
-        finally:
-            Path(temp_file).unlink()
+        assert result.returncode == 0
+        assert "X = a" in result.stdout or "X = a ;" in result.stdout
 
-    def test_interactive_with_file_still_works(self):
+    def test_interactive_with_file_still_works(self, tmp_path):
         """Test that loading a file and starting interactive mode still works."""
-        # Create a temporary Prolog file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.pl', delete=False) as f:
-            f.write("test_pred(a).\ntest_pred(b).\n")
-            temp_file = f.name
+        prolog_file = tmp_path / "test.pl"
+        prolog_file.write_text("test_pred(a).\ntest_pred(b).\n")
 
-        try:
-            result = self.run_cli([temp_file], input_text="test_pred(X).\nquit.\n")
+        result = self.run_cli([str(prolog_file)], input_text="test_pred(X).\nquit.\n")
 
-            assert result.returncode == 0
-            assert "X = a" in result.stdout or "X = a ;" in result.stdout
-        finally:
-            Path(temp_file).unlink()
+        assert result.returncode == 0
+        assert "X = a" in result.stdout or "X = a ;" in result.stdout
 
     def test_invalid_file_error(self):
         """Test error handling for non-existent file."""
