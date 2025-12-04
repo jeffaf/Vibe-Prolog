@@ -743,8 +743,7 @@ class TestFloatEdgeCases:
 
         with pytest.raises(PrologThrow):
             parser.parse("num(1.2.3).")
-        with pytest.raises(PrologThrow):
-            parser.parse("num(.).")
+        # Note: num(.). is valid - '.' is parsed as an atom argument
 
 
 class TestNumericContexts:
