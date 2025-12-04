@@ -551,6 +551,39 @@ When importing a shadowed predicate:
 ?- length([a, b], L).  % Uses imported shadow: L = s(s(custom_zero))
 ```
 
+### Operator Shadowing
+
+The `shadow` mode is particularly important for CLP (Constraint Logic Programming) libraries like `clpz` and `clpb` that need to redefine the `|` operator with extended semantics for constraint programming.
+
+**Protected Operators:**
+
+The following operators are protected and require `shadow` mode to redefine:
+- `,` (conjunction)
+- `;` (disjunction)
+- `->` (if-then)
+- `:-` (clause/directive)
+- `:` (module qualification)
+- `|` (list/constraint syntax)
+- `{}` (curly braces)
+
+**Key Characteristics:**
+- Module-scoped shadowing: Protected operators can be redefined within a module's scope without affecting global behavior
+- List syntax preservation: Shadowing `|` does not break standard list syntax `[H|T]`
+- Independent modules: Multiple modules can independently shadow the same operator
+- Global protection: Protected operators cannot be modified at global scope even in shadow mode
+
+**Example - Loading CLP libraries:**
+```bash
+# Load clpz with shadow mode to allow | operator redefinition
+uv run vibeprolog.py --builtin-conflict=shadow my_program.pl
+```
+
+```prolog
+:- use_module(library(clpz)).
+?- X in 1..10, X #> 5, label([X]).  % CLP constraint programming works
+?- Y = [a, b | [c]].                % Standard list syntax still works: Y = [a, b, c]
+```
+
 ### `--run-slow-tests` Flag
 
 Controls whether pytest includes the subset of tests that currently take longer than ~4 seconds.

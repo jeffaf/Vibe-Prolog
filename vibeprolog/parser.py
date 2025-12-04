@@ -1424,12 +1424,15 @@ class PrologParser:
             grammar, parser="earley", propagate_positions=True, ambiguity='resolve'
         )
 
-    def _base_operator_definitions(self) -> list[tuple[int, str, str]]:
+    def _base_operator_definitions(
+        self, module_name: str | None = None
+    ) -> list[tuple[int, str, str]]:
         if self.operator_table is None:
             return list(DEFAULT_OPERATORS)
+        # Use module-aware operator iteration to include shadowed operators
         return [
             (info.precedence, info.spec, name)
-            for name, info in self.operator_table.iter_current_ops()
+            for name, info in self.operator_table.iter_operators_for_module(module_name)
         ]
 
     def _build_grammar(self, operators: list[tuple[int, str, str]]) -> str:
@@ -1437,14 +1440,19 @@ class PrologParser:
         return PROLOG_GRAMMAR.replace("__OPERATOR_GRAMMAR__", operator_rules)
 
     def _ensure_parser(
-        self, cleaned_text: str, directive_ops: list[tuple[int, str, str]] | None = None
+        self,
+        cleaned_text: str,
+        directive_ops: list[tuple[int, str, str]] | None = None,
+        module_name: str | None = None,
     ) -> None:
         if directive_ops is None:
             try:
                 directive_ops = extract_op_directives(cleaned_text)
             except ValueError:
                 directive_ops = []
-        operators = _merge_operators(self._base_operator_definitions(), directive_ops)
+        operators = _merge_operators(
+            self._base_operator_definitions(module_name), directive_ops
+        )
         key = tuple(operators)
         if key not in self._grammar_cache:
             grammar = self._build_grammar(operators)
@@ -1603,14 +1611,23 @@ class PrologParser:
         *,
         apply_char_conversions: bool = True,
         directive_ops: list[tuple[int, str, str]] | None = None,
+        module_name: str | None = None,
     ) -> list[Clause | Directive]:
-        """Parse Prolog source code and return list of clauses."""
+        """Parse Prolog source code and return list of clauses.
+
+        Args:
+            text: The Prolog source code to parse
+            context: Context string for error messages
+            apply_char_conversions: Whether to apply character conversions
+            directive_ops: Pre-extracted operator directives
+            module_name: Current module context for module-scoped operators
+        """
         try:
             # Apply character conversions before parsing
             if apply_char_conversions:
                 text = self._apply_char_conversions(text)
             cleaned_text, pldoc_comments = self._collect_pldoc_comments(text)
-            self._ensure_parser(cleaned_text, directive_ops)
+            self._ensure_parser(cleaned_text, directive_ops, module_name)
             tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
             parsed_items = [self._fold_numeric_unary_minus(item) for item in transformer.transform(tree)]
