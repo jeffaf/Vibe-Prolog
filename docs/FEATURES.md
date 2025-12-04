@@ -31,6 +31,7 @@ Status legend:
 | Query prefix operator `?-` (1200, fx) | ✅ | **ISO-required** - Parsed via operator table |
 | DCG rule operator `-->` (1200, xfx) | ✅    | **ISO-required** - DCG syntax |
 | `:- char_conversion/2`           | ✅      | **ISO-mandatory** - Character conversion during parsing |
+| Dot as clause terminator         | ✅      | Correctly ignores dots inside parentheses/brackets/braces |
 
 ---
 

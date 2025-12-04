@@ -935,3 +935,34 @@ class TestTokenizePrologStatements:
         code = "p(.5)."
         chunks = tokenize_prolog_statements(code)
         assert chunks == ["p(.5)."]
+
+
+class TestDotInParentheses:
+    """Test that dots inside parentheses are not clause terminators."""
+
+    def test_dot_as_atom_argument(self):
+        """Dot used as an atom argument inside compound term."""
+        from vibeprolog.parser import tokenize_prolog_statements
+
+        code = 'phrase(upto_what(Bs0, .), Cs0, Ds).'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 1
+        assert '.' in statements[0]  # Contains the argument dot
+
+    def test_dot_in_list(self):
+        """Dot used as element in a list."""
+        code = 'test([., a, b]).'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 1
+
+    def test_multiple_dots_in_term(self):
+        """Multiple dots in complex term."""
+        code = 'foo(bar(., X), baz(Y, .)).'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 1
+
+    def test_dot_at_end_is_terminator(self):
+        """Dot at end of clause is still a terminator."""
+        code = 'foo(a, b). bar(c, d).'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 2
