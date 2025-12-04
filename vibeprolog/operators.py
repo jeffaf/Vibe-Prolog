@@ -208,13 +208,12 @@ class OperatorTable:
                 return
             elif self._builtin_conflict == "shadow":
                 if module_name is not None:
-                    if module_name not in self._module_operators:
-                        self._module_operators[module_name] = {}
+                    module_ops = self._module_operators.setdefault(module_name, {})
                     if precedence_value == 0:
-                        self._module_operators[module_name].pop(key, None)
+                        module_ops.pop(key, None)
                         self._shadowed_operators.discard((module_name, name, spec))
                     else:
-                        self._module_operators[module_name][key] = OperatorInfo(
+                        module_ops[key] = OperatorInfo(
                             precedence_value, spec
                         )
                         self._shadowed_operators.add((module_name, name, spec))
