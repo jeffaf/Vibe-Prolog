@@ -1225,6 +1225,22 @@ def _format_operator_literals(ops: Iterable[str]) -> str:
     return " | ".join(formatted)
 
 
+def _operator_token_priority(name: str) -> int:
+    """Choose a token priority that beats the generic OP_SYMBOL lexer rule.
+
+    OP_SYMBOL has priority 25 and eagerly matches runs of operator punctuation,
+    which would swallow custom operators like +++ or ***, preventing the
+    operator-specific tokens from ever being seen by the parser. By giving
+    punctuation-heavy operators a priority above 25 we ensure the generated
+    operator tokens win when they are valid in the current parse context.
+    """
+    if re.match(r"^[A-Za-z0-9_]+$", name):
+        return max(len(name), 1)
+    if len(name) > 1:
+        return 30 + len(name)
+    return 1
+
+
 def _merge_operators(
     base_ops: Iterable[tuple[int, str, str]], directives: list[tuple[int, str, str]]
 ) -> list[tuple[int, str, str]]:
@@ -1292,13 +1308,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(infix_specs["xfx"]):
                 token_counter += 1
                 token = f"INFIX_XFX_{precedence}_{token_counter}"
-                # Only increase priority for operators that contain special characters
-                # that might interfere with number parsing (e.g., .. needs priority > NUMBER.4)
-                # Keep letter-based operators at their natural priority
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)  # Ensure > NUMBER priority
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{lower_rule} {token} {lower_rule} -> infix_xfx")
@@ -1306,10 +1316,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(infix_specs["yfx"]):
                 token_counter += 1
                 token = f"INFIX_YFX_{precedence}_{token_counter}"
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{rule_name} {token} {lower_rule} -> infix_yfx")
@@ -1317,10 +1324,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(infix_specs["xfy"]):
                 token_counter += 1
                 token = f"INFIX_XFY_{precedence}_{token_counter}"
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{lower_rule} {token} {rule_name} -> infix_xfy")
@@ -1328,10 +1332,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(infix_specs["yfy"]):
                 token_counter += 1
                 token = f"INFIX_YFY_{precedence}_{token_counter}"
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{rule_name} {token} {rule_name} -> infix_yfy")
@@ -1340,10 +1341,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(prefix_specs["fx"]):
                 token_counter += 1
                 token = f"PREFIX_FX_{precedence}_{token_counter}"
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{token} {lower_rule} -> prefix_fx")
@@ -1351,10 +1349,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(prefix_specs["fy"]):
                 token_counter += 1
                 token = f"PREFIX_FY_{precedence}_{token_counter}"
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{token} {rule_name} -> prefix_fy")
@@ -1363,10 +1358,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(postfix_specs["xf"]):
                 token_counter += 1
                 token = f"POSTFIX_XF_{precedence}_{token_counter}"
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{lower_rule} {token} -> postfix_xf")
@@ -1374,10 +1366,7 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
             for name in sorted(postfix_specs["yf"]):
                 token_counter += 1
                 token = f"POSTFIX_YF_{precedence}_{token_counter}"
-                if any(c in name for c in ".+-*/<>=\\@#$&!~:?^"):
-                    priority = max(5, len(name) + 4)
-                else:
-                    priority = len(name)
+                priority = _operator_token_priority(name)
                 token_def = f"{token}.{priority}" if priority else token
                 tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
                 parts.append(f"{rule_name} {token} -> postfix_yf")
