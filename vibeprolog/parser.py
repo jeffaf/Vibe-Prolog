@@ -180,7 +180,7 @@ __OPERATOR_GRAMMAR__
     // Character codes: 0'X where X is any character (must come before NUMBER)
     // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex)
     // Allow trailing quote (e.g., 0'\\') while keeping legacy forms without it; allow broader alphanumerics after \\x so lexer does not reject malformed hex sequences that should become syntax errors
-    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\|\\\\['tnr]|''|[^'\\])'?/ | /\d+'.'/
+    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\|\\\\['tnr]|''|[^'\\])'?/ | /[1-9]\d*'.'/
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
@@ -748,9 +748,8 @@ class PrologTransformer(Transformer):
             parts = code_str.split("'")
             if len(parts) >= 2:
                 if not parts[1]:
-                    # This case, e.g., from `16''`, would cause `ord('')` to crash.
-                    # Treating as an invalid char code for now to prevent a crash.
-                    return Number(0)
+                    # Empty character code - reject as syntax error
+                    raise ValueError("unexpected_char")
                 char = parts[1][0]
                 return Number(ord(char))
 
@@ -766,6 +765,10 @@ class PrologTransformer(Transformer):
                 and char_part not in {"''", "\\'"}
             ):
                 char_part = char_part[:-1]
+
+            # Reject empty character codes
+            if not char_part or char_part == "'":
+                raise ValueError("unexpected_char")
 
             # Handle doubled quote escape ''
             if char_part == "''":
