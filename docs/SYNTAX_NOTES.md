@@ -8,9 +8,9 @@ This document provides detailed notes on Vibe-Prolog's syntax features, includin
 
 | Format | Example | Value | Status | Notes |
 |--------|---------|-------|--------|-------|
-| Integer | `42`, `-17` | 42, -17 | ✅ Supported | Case-insensitive exponent marker |
-| Float | `3.14`, `-0.5` | 3.14, -0.5 | ✅ Supported | Matches ISO/Scryer/SWI behavior |
-| Scientific notation | `1.5e-3`, `2E10` | 0.0015, 20000000000 | ✅ Supported | `e` or `E` accepted |
+| Integer | `42`, `-17` | 42, -17 | ✅ Supported | Not applicable |
+| Float | `3.14`, `-0.5` | 3.14, -0.5 | ✅ Supported | - |
+| Scientific notation | `1.5e-3`, `2E10` | 0.0015, 20000000000 | ✅ Supported | - |
 | Underscore grouping | `1_000_000` | 1000000 | ✅ Supported | Same as Scryer & SWI |
 | Space grouping | `1 000 000` | — | ❌ Not supported | SWI-only extension |
 
