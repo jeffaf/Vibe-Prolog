@@ -1450,7 +1450,11 @@ class PrologParser:
 
     def _create_parser(self, grammar: str):
         return Lark(
-            grammar, parser="earley", propagate_positions=True, ambiguity='resolve'
+            grammar,
+            parser="earley",
+            propagate_positions=True,
+            ambiguity='resolve',
+            start=["start", "clause", "directive"],
         )
 
     def _base_operator_definitions(
@@ -1657,9 +1661,39 @@ class PrologParser:
                 text = self._apply_char_conversions(text)
             cleaned_text, pldoc_comments = self._collect_pldoc_comments(text)
             self._ensure_parser(cleaned_text, directive_ops, module_name)
-            tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
-            parsed_items = [self._fold_numeric_unary_minus(item) for item in transformer.transform(tree)]
+            parsed_items: list[Clause | Directive] = []
+
+            # Parse each clause/directive separately to avoid Earley state explosion
+            # on large files with many clauses.
+            statements = tokenize_prolog_statements(cleaned_text)
+            search_pos = 0
+            for statement in statements:
+                # Track position of the statement within the cleaned text so that
+                # PlDoc association via start_pos still works.
+                stmt_pos = cleaned_text.find(statement, search_pos)
+                if stmt_pos == -1:
+                    stmt_pos = search_pos
+                search_pos = stmt_pos + len(statement)
+
+                stripped = statement.lstrip()
+                start_rule = "directive" if stripped.startswith(":-") else "clause"
+                try:
+                    tree = self.parser.parse(statement, start=start_rule)
+                except LarkError:
+                    tree = self.parser.parse(statement, start="start")
+                transformed = transformer.transform(tree)
+                if isinstance(transformed, list):
+                    parsed = transformed
+                else:
+                    parsed = [transformed]
+
+                items = [self._fold_numeric_unary_minus(item) for item in parsed]
+                for item in items:
+                    meta = getattr(item, "meta", None)
+                    if meta is not None and hasattr(meta, "start_pos"):
+                        meta.start_pos += stmt_pos
+                parsed_items.extend(items)
             # Associate PlDoc comments with items
             self._associate_pldoc_comments(parsed_items, pldoc_comments)
             return parsed_items
