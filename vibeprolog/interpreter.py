@@ -68,9 +68,9 @@ class PrologInterpreter:
         max_recursion_depth: int = 10000,
         builtin_conflict: str = "skip",
     ) -> None:
-        self.operator_table = OperatorTable()
+        self.operator_table = OperatorTable(builtin_conflict=builtin_conflict)
         self.parser = PrologParser(self.operator_table)
-        self._import_scanner_parser = PrologParser(OperatorTable())
+        self._import_scanner_parser = PrologParser(OperatorTable(builtin_conflict=builtin_conflict))
         self.clauses = []
         # Module system
         self.modules: dict[str, "Module"] = {}
@@ -483,7 +483,13 @@ class PrologInterpreter:
                 # Import all exported operators (full import only)
                 for op_def in source_mod.exported_operators:
                     precedence, spec, name = op_def
-                    self.operator_table.define(Number(precedence), Atom(spec), Atom(name), "use_module/1")
+                    self.operator_table.define(
+                        Number(precedence),
+                        Atom(spec),
+                        Atom(name),
+                        "use_module/1",
+                        module_name=self.current_module,
+                    )
             else:
                 # Import specific predicates (operators not imported in selective import)
                 for pred_key in imports:
@@ -503,7 +509,13 @@ class PrologInterpreter:
         # Reject unsupported directives
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
             prec_term, spec_term, name_term = goal.args
-            self.operator_table.define(prec_term, spec_term, name_term, "op/3")
+            self.operator_table.define(
+                prec_term,
+                spec_term,
+                name_term,
+                "op/3",
+                module_name=self.current_module,
+            )
             return
 
         # Handle char_conversion/2 directive
@@ -1298,6 +1310,7 @@ class PrologInterpreter:
                     "consult/1",
                     apply_char_conversions=not is_char_conversion,
                     directive_ops=directive_ops,
+                    module_name=self.current_module,
                 )
             except (ValueError, LarkError) as exc:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")
@@ -1479,7 +1492,14 @@ class PrologInterpreter:
         prolog_code = f"dummy :- {query_str}"
         try:
             # Don't apply char conversions to interactive queries
-            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
+            # Use "user" module context for top-level queries - module-scoped
+            # operators in other modules should not affect user queries
+            clauses = self.parser.parse(
+                prolog_code,
+                "query/1",
+                apply_char_conversions=False,
+                module_name="user",
+            )
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
 
@@ -1491,7 +1511,13 @@ class PrologInterpreter:
         prolog_code = query_str
         try:
             # Don't apply char conversions to interactive queries
-            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
+            # Use "user" module context for top-level queries
+            clauses = self.parser.parse(
+                prolog_code,
+                "query/1",
+                apply_char_conversions=False,
+                module_name="user",
+            )
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
         if clauses:
