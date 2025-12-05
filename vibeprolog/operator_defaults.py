@@ -44,6 +44,16 @@ DEFAULT_OPERATORS: list[tuple[int, str, str]] = [
     (200, "xfy", "^"),
     (200, "fy", "+"),
     (200, "fy", "-"),
+    # CLP(Z)-style comparison operators needed by bundled libraries
+    (700, "xfx", "#>"),
+    (700, "xfx", "#<"),
+    (700, "xfx", "#>="),
+    (700, "xfx", "#=<"),
+    (700, "xfx", "#="),
+    (700, "xfx", "#\\="),
+    (700, "xfx", "in"),
+    (700, "xfx", "ins"),
+    (450, "xfx", ".."),
     # Scryer-specific operator (recognized but directive is ignored)
     (700, "fx", "non_counted_backtracking"),
     # Attribute declaration for attributed variables

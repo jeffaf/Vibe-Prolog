@@ -2,7 +2,7 @@
    Written 2020-2025 by Markus Triska (triska@metalevel.at)
    Part of Scryer Prolog.
 
-/** Predicates for cryptographic applications.
+* Predicates for cryptographic applications.
 
    This library assumes that the Prolog flag `double_quotes` is set to `chars`.
    In Scryer Prolog, lists of characters are very efficiently represented,
