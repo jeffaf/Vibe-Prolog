@@ -1,6 +1,6 @@
 # Vibe-Prolog Grammar Comparison: Vibe vs Scryer vs SWI
 
-This document provides a detailed three-way comparison of the grammar implementations in Vibe-Prolog, Scryer-Prolog, and SWI-Prolog, highlighting similarities, differences, and potential incompatibilities.
+This document provides a detailed three-way comparison of the grammar implementations in Vibe-Prolog, Scryer-Prolog, and SWI-Prolog, highlighting similarities, differences, and potential incompatibilities. For end-to-end SWI compatibility guidance, see [tests/README_SWI_COMPATIBILITY.md](../tests/README_SWI_COMPATIBILITY.md).
 
 ## Executive Summary
 
