@@ -616,12 +616,9 @@ class PrologTransformer(Transformer):
 
     def atom(self, items):
         atom_str = str(items[0])
-        # Reject a bare dot as it's a special terminator token
-        if atom_str == ".":
-            raise PrologThrow(PrologError.syntax_error(
-                "Unexpected '.' - dot is a clause terminator and cannot be used as an atom",
-                "atom/1"
-            ))
+        # Note: A single '.' is valid as an atom when used in expression context
+        # (e.g., as an argument to a functor). The clause splitter already ensures
+        # dots in parenthesized contexts are not treated as clause terminators.
         # Handle SPECIAL_ATOM (quoted atoms like ';', '|', etc.)
         if atom_str.startswith("'") and atom_str.endswith("'") and len(atom_str) >= 2:
             # Strip the quotes and handle escape sequences
@@ -942,11 +939,25 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
             current.append(char)
             # Heuristic to check if this period is part of a number (e.g., 1.2 or 1.)
             # to avoid splitting clauses incorrectly.
-            is_decimal_point = (i > 0 and prolog_code[i-1].isdigit()) or \
-                                (i + 1 < len(prolog_code) and prolog_code[i+1].isdigit())
-            if is_decimal_point:
-                i += 1
-                continue
+            # A period after digit-dot-dot-digit (e.g., "1..9.") is a clause terminator,
+            # not a decimal point, even though the previous char is a digit.
+            current_str = ''.join(current)
+            # Check for range pattern: ends with digits followed by "."
+            # and contains ".." somewhere before those digits
+            # Pattern: ...X..Y. where X and Y are digits
+            ends_with_range_and_dot = bool(re.search(r'\d\.\.\d+\.$', current_str))
+            if ends_with_range_and_dot:
+                # This is definitely a terminator after a range expression
+                pass  # Fall through to clause ending logic below
+            else:
+                # Check if this could be a decimal point
+                is_decimal_point = (
+                    (i > 0 and prolog_code[i-1].isdigit()) or
+                    (i + 1 < len(prolog_code) and prolog_code[i+1].isdigit())
+                )
+                if is_decimal_point:
+                    i += 1
+                    continue
             # End of clause
             if has_code:
                 chunks.append(''.join(current))
