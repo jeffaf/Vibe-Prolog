@@ -766,13 +766,9 @@ class PrologTransformer(Transformer):
             ):
                 char_part = char_part[:-1]
 
-            # Reject empty character codes
-            if not char_part or char_part == "'":
+            # Reject empty character codes, including 0''
+            if not char_part or char_part == "'" or char_part == "''":
                 raise ValueError("unexpected_char")
-
-            # Handle doubled quote escape ''
-            if char_part == "''":
-                return Number(ord("'"))
 
             # Handle backslash escape sequences
             if char_part.startswith("\\"):

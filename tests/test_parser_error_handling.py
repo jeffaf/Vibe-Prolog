@@ -45,6 +45,7 @@ class TestParserErrorHandling:
         error_term = excinfo.value.term
         assert isinstance(error_term, Compound)
         assert error_term.functor == "error"
+        assert error_term.args[1] == Compound("context", (Atom("query/1"),))
         syntax_term = error_term.args[0]
         assert isinstance(syntax_term, Compound)
         assert syntax_term.functor == "syntax_error"
