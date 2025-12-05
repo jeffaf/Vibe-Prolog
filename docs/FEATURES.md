@@ -17,7 +17,7 @@ Status legend:
 | -------------------------------- | ------ | ----------------------------------------- |
 | Atoms (quoted, unquoted)         | ✅      | Fully implemented                         |
 | Variables                        | ✅      | ISO semantics                             |
-| Numbers (int, float, scientific) | ✅      | Includes Edinburgh `<radix>'<number>` syntax (`16'ff`, `2'1010`, `36'ZZZ`) for bases 2-36 |
+| Numbers (int, float, scientific) | ✅      | Includes Edinburgh `<radix>'<number>` syntax (`16'ff`, `2'1010`, `36'ZZZ`) for bases 2-36; `0x` prefix accepts case-insensitive hex digits (`0xFF`, `0xff`, `0xAbC`) |
 | Lists (proper, improper)         | ✅      |                                           |
 | Compound terms                   | ✅      |                                           |
 | Strings (quoted)                 | ✅      | Consistent representation                 |
