@@ -450,8 +450,10 @@ def execute_test(prolog: PrologInterpreter, test: ConformityTest, verbose: bool 
                 # Execute the previous test first to set up operators
                 try:
                     prolog.query_once(prev_test.query)
-                except Exception:
-                    pass  # Ignore errors in setup
+                except Exception as e:
+                    if verbose:
+                        print(f"  Warning: Referenced test {prev_test.num} failed during setup: {e}")
+                    pass  # Ignore errors in setup, but log them if verbose
 
         if verbose:
             print(f"  Executing test {test.num}: {test.query}")
