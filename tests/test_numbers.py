@@ -211,3 +211,27 @@ class TestEdgeCases:
 
         num = parser.parse_term("0.000_001")
         assert num.value == 0.000001
+
+
+class TestBaseNumberUnderscoreGrouping:
+    """Tests for underscore grouping in Edinburgh-style base numbers."""
+
+    def test_valid_base_number_grouping(self):
+        """Test valid underscore grouping in base numbers."""
+        parser = PrologParser()
+        num = parser.parse_term("16'f_f")
+        assert num.value == 255
+        num = parser.parse_term("2'1010_0101")
+        assert num.value == 165
+        num = parser.parse_term("-10'1_000")
+        assert num.value == -1000
+
+    def test_invalid_base_number_grouping(self):
+        """Test invalid underscore placements in base numbers."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow):
+            parser.parse_term("16'_ff")  # Leading underscore
+        with pytest.raises(PrologThrow):
+            parser.parse_term("16'ff_")  # Trailing underscore
+        with pytest.raises(PrologThrow):
+            parser.parse_term("16'f__f")  # Double underscore

@@ -195,7 +195,7 @@ __OPERATOR_GRAMMAR__
             | /-?[\d_]+\.?[\d_]*[eE][+-]?[\d_]+/
             | /-?[\d_]+\.[\d_]+/
             | /-?\.[\d_]+/
-            | /-?\d+'[a-zA-Z0-9_]+/
+            | /-?\d+['][a-zA-Z0-9_]+/
             | /-?[\d_]+/
 
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
@@ -700,6 +700,8 @@ class PrologTransformer(Transformer):
 
         Examples: 16'ff' (hex), 2'1010' (binary), 36'ZZZ' (base-36)
         """
+        # Validate underscores in Edinburgh-style base numbers
+        self._validate_underscore_placement(value, special_chars="'")
         # Handle negative sign
         negative = value.startswith('-')
         if negative:
