@@ -128,6 +128,7 @@ class TestModuleExports:
         prolog.consult_string(code)
         assert len(prolog.modules["test_mod"].exports) == 0
 
+    @pytest.mark.slow
     def test_library_builtins_loads_successfully(self):
         """Test that library/builtins.pl loads successfully despite control constructs in exports."""
         prolog = PrologInterpreter()

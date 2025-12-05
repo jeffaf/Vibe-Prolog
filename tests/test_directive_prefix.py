@@ -88,6 +88,7 @@ class TestModuleDirectives:
         assert prolog.has_solution("mymod:foo(1, a)")
         assert prolog.has_solution("mymod:foo(2, b)")
 
+    @pytest.mark.slow
     def test_use_module_directive_prefix_form(self):
         """Test that :- use_module(library(lists)) loads the lists module."""
         prolog = PrologInterpreter()

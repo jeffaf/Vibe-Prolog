@@ -110,6 +110,7 @@ class TestBlockCommentSyntax:
         assert len(clauses) == 1
         assert clauses[0].head.name == "actual_fact"
 
+    @pytest.mark.slow
     def test_crypto_library_loads(self):
         """Test that library/crypto.pl comments parse without syntax errors."""
         parser = PrologParser()
