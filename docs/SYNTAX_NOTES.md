@@ -67,7 +67,7 @@ Vibe-Prolog supports the Edinburgh `<radix>'<number>` notation for bases 2-36:
 | Backslash | `0'\\` | 92 | ✅ Supported | Escaped backslash |
 | Single quote | `0'\'` | 39 | ✅ Supported | Escaped quote |
 | Double quote | `0'\"` | 34 | ✅ Supported | Escaped quote |
-| Empty | `0''` | 0 | ✅ Supported | Edge case: returns 0 |
+| Empty | `0''` | N/A | ❌ Rejected | Syntax error as per ISO |
 
 **Difference from Scryer-Prolog**: Vibe does not require a trailing backslash for hex/octal escapes.
 
@@ -414,10 +414,6 @@ These features are specific to Vibe-Prolog and may not be portable:
    :- endif.
    ```
 
-3. **Character code edge cases**:
-   ```prolog
-   0''    % Returns 0 (empty character)
-   ```
 
 ## Known Limitations
 

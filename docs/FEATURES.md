@@ -23,7 +23,7 @@ Status legend:
 | Strings (quoted)                 | ✅      | Consistent representation                 |
 | `%` line comments                | ✅      |                                           |
 | `/* … */` block comments         | ✅      | Nested supported; `/**` starts PlDoc comments |
-| Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
+| Character code syntax (`0'X`)    | ✅      | ISO-compliant - rejects empty literals    |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
 | Directive prefix operator `:-` (1200, fx) | ✅ | **ISO-required** - Prefix form for directives |
