@@ -249,6 +249,30 @@ uv run python tools/find_builtins.py examples/
 
 **Note:** This tool identifies predicates, not operators. Operators are syntactic and checked by `check_operators.py`.
 
+### ISO Conformity Testing (`tools/conformity_test.py`)
+
+Tests Vibe-Prolog against the official ISO Prolog conformity test suite (355 tests).
+
+**Usage:**
+```bash
+# Run all tests and generate report
+uv run python tools/conformity_test.py
+
+# Run specific tests
+uv run python tools/conformity_test.py --tests 1-50
+
+# Verbose output
+uv run python tools/conformity_test.py --verbose
+```
+
+**When to use:**
+- Before major releases to verify ISO compliance
+- After parser/syntax changes to catch regressions
+- When investigating ISO compatibility issues
+- To track conformity improvements over time
+
+**Output:** Generates `docs/CONFORMITY_TESTING.md` with detailed results.
+
 ## Resources
 
 - [SWI-Prolog Documentation](https://www.swi-prolog.org/pldoc/man?section=builtin) - Reference for built-in predicates

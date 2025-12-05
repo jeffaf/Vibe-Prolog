@@ -489,6 +489,17 @@ Common extensions frequently used in real-world Prolog programs:
 
 ---
 
+## ISO Conformity Testing
+
+Vibe-Prolog is tested against the official ISO/IEC JTC1 SC22 WG17 conformity test suite:
+- 355 test cases covering syntax, operators, escapes, and numeric literals
+- Results tracked in [docs/CONFORMITY_TESTING.md](./CONFORMITY_TESTING.md)
+- Tests can be re-run with `uv run python tools/conformity_test.py`
+
+Current conformity: Run `uv run python tools/conformity_test.py` to see current results
+
+---
+
 ## Command-Line Interface
 
 The Vibe-Prolog CLI supports both interactive and batch modes, with optional program file loading.
