@@ -163,11 +163,13 @@ class TestProtectedOperators:
 class TestLibraryCompatibility:
     """Tests for library compatibility with shadow mode."""
 
+    @pytest.mark.slow
     def test_can_load_iso_ext_with_shadow_mode(self):
         """library/iso_ext.pl should load with shadow mode."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
         prolog.consult_string(":- use_module(library(iso_ext)).")
 
+    @pytest.mark.slow
     def test_can_load_dcgs_with_shadow_mode(self):
         """library/dcgs.pl should load with shadow mode."""
         prolog = PrologInterpreter(builtin_conflict="shadow")

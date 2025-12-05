@@ -43,6 +43,7 @@ class TestDeepTailRecursion:
         assert result is not None
         assert result['X'] == 500500
 
+    @pytest.mark.slow
     def test_length_tail_recursive(self):
         """Test tail-recursive list length calculation."""
         prolog = PrologInterpreter()
