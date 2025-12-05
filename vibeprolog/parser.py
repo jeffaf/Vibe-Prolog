@@ -659,16 +659,15 @@ class PrologTransformer(Transformer):
         elif "'" in value:
             # Base'digits syntax
             return self._parse_base_number(value)
-        elif "e" in value.lower() or "." in value:
-            # Scientific notation or float
-            self._validate_underscore_placement(value)
-            value = value.replace('_', '')
-            return Number(float(value))
         else:
-            # Regular integer
             self._validate_underscore_placement(value)
-            value = value.replace('_', '')
-            return Number(int(value))
+            clean_value = value.replace('_', '')
+            if "e" in value.lower() or "." in value:
+                # Scientific notation or float
+                return Number(float(clean_value))
+            else:
+                # Regular integer
+                return Number(int(clean_value))
 
     def negative_number(self, items):
         # The grammar rule `primary: "-" number -> negative_number` ensures
