@@ -1772,7 +1772,7 @@ class PrologParser:
                 clause_text = self._apply_char_conversions(clause_text)
             cleaned_text, _ = self._collect_pldoc_comments(clause_text)
             self._ensure_parser(cleaned_text)
-            tree = self.parser.parse(cleaned_text)
+            tree = self.parser.parse(cleaned_text, start="start")
             transformer = PrologTransformer()
             result = transformer.transform(tree)
             if result and isinstance(result[0], Clause):
