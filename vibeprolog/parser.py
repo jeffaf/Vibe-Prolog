@@ -677,8 +677,8 @@ class PrologTransformer(Transformer):
         assert isinstance(num, Number), f"Expected Number, got {type(num).__name__}"
         return Number(-num.value)
 
-    def _validate_underscore_placement(self, value: str) -> None:
-        """Validate underscore placement in decimal number strings."""
+    def _validate_underscore_placement(self, value: str, special_chars: str = ".eE+-") -> None:
+        """Validate underscore placement in number strings."""
         if '_' not in value:
             return
         # No leading or trailing underscores
@@ -688,7 +688,7 @@ class PrologTransformer(Transformer):
         if '__' in value:
             raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
         # No underscores adjacent to special characters
-        for char in '.eE+-':
+        for char in special_chars:
             if f'_{char}' in value or f'{char}_' in value:
                 raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
 
