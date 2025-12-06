@@ -617,11 +617,11 @@ class PrologTransformer(Transformer):
         return s
 
     def atom(self, items):
-         atom_str = str(items[0])
-         # Note: A single '.' is valid as an atom when used in expression context
-         # (e.g., as an argument to a functor). The clause splitter already ensures
-         # dots in parenthesized contexts are not treated as clause terminators.
-         # Handle SPECIAL_ATOM (quoted atoms like ';', '|', etc.)
+        atom_str = str(items[0])
+        # Note: A single '.' is valid as an atom when used in expression context
+        # (e.g., as an argument to a functor). The clause splitter already ensures
+        # dots in parenthesized contexts are not treated as clause terminators.
+        # Handle SPECIAL_ATOM (quoted atoms like ';', '|', etc.)
         if atom_str.startswith("'") and atom_str.endswith("'") and len(atom_str) >= 2:
             # Strip the quotes and handle escape sequences
             atom_str = atom_str[1:-1]
