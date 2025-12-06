@@ -322,6 +322,13 @@ class PrologInterpreter:
                     self.predicate_docs[key] = processed_clause.doc
             elif isinstance(item, Directive):
                 self._handle_directive(item, closed_predicates, source_name)
+                if (
+                    isinstance(item.goal, Compound)
+                    and item.goal.functor == "module"
+                ):
+                    # Module boundaries reset predicate continuity; discontiguous
+                    # tracking should start fresh in the new module.
+                    last_predicate = None
                 # Store PlDoc for directives if needed
                 if item.doc:
                     # For now, ignore directive docs

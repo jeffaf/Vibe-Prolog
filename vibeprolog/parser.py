@@ -831,6 +831,40 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
     bracket_depth = 0
     brace_depth = 0
 
+    def _is_edinburgh_radix_quote(index: int) -> bool:
+        """Return True if apostrophe at ``index`` starts an Edinburgh radix literal.
+
+        Detects forms like ``16'FF`` or ``-2'1010`` where the apostrophe should
+        not open a quoted atom. We look backwards from the apostrophe to find
+        a contiguous run of digits/underscores (optionally preceded by a sign)
+        and ensure the next character begins the digit sequence.
+        """
+
+        # Need a following digit/letter/underscore to be a valid digits section
+        if index + 1 >= len(prolog_code) or not (
+            prolog_code[index + 1].isalnum() or prolog_code[index + 1] == "_"
+        ):
+            return False
+
+        # Walk backwards to collect the radix digits
+        j = index - 1
+        while j >= 0 and (prolog_code[j].isdigit() or prolog_code[j] == "_"):
+            j -= 1
+
+        # Require at least one digit immediately before the apostrophe
+        if j == index - 1:
+            return False
+
+        # Allow an optional sign directly before the digits
+        if j >= 0 and prolog_code[j] in "+-":
+            j -= 1
+
+        # Disallow letters directly before the radix to avoid false positives
+        if j >= 0 and (prolog_code[j].isalnum() or prolog_code[j] == "_"):
+            return False
+
+        return True
+
     while i < len(prolog_code):
         char = prolog_code[i]
 
@@ -874,6 +908,17 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
         # Handle entering/exiting quotes
         if char == "'" and not in_double_quote:
             has_code = True
+            if not in_single_quote and (
+                (i > 0 and prolog_code[i - 1] == "0")
+                or _is_edinburgh_radix_quote(i)
+            ):
+                # Character code literal (e.g., 0'a, 0'\x41\) uses a leading
+                # single quote but does not introduce a quoted atom scope.
+                # Edinburgh radix numbers (<radix>'<digits>) likewise should
+                # not open quoted atom mode.
+                current.append(char)
+                i += 1
+                continue
             # Check for doubled quote
             if in_single_quote and i + 1 < len(prolog_code) and prolog_code[i + 1] == "'":
                 current.append(char)
@@ -895,11 +940,34 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
         # Check for comment starts
         if not in_single_quote and not in_double_quote:
             if char == '%':
+                if not has_code and not current:
+                    # Skip leading standalone comments so they don't attach to the
+                    # next clause/directive chunk.
+                    while i < len(prolog_code) and prolog_code[i] != '\n':
+                        i += 1
+                    continue
                 in_line_comment = True
                 current.append(char)
                 i += 1
                 continue
             if prolog_code[i:i+2] == '/*':
+                if not has_code and not current:
+                    # Skip standalone block comments before any code in this chunk.
+                    depth = 1
+                    i += 2
+                    while i < len(prolog_code) and depth > 0:
+                        if prolog_code[i:i+2] == '/*':
+                            depth += 1
+                            i += 2
+                            continue
+                        if prolog_code[i:i+2] == '*/':
+                            depth -= 1
+                            i += 2
+                            continue
+                        i += 1
+                    if depth > 0:
+                        raise ValueError("Unterminated block comment")
+                    continue
                 in_block_comment = 1
                 current.append(char)
                 current.append(prolog_code[i+1])
@@ -1472,7 +1540,11 @@ class PrologParser:
 
     def _create_parser(self, grammar: str):
         return Lark(
-            grammar, parser="earley", propagate_positions=True, ambiguity='resolve'
+            grammar,
+            parser="earley",
+            propagate_positions=True,
+            ambiguity='resolve',
+            start=["start", "clause", "directive"],
         )
 
     def _base_operator_definitions(
@@ -1679,9 +1751,41 @@ class PrologParser:
                 text = self._apply_char_conversions(text)
             cleaned_text, pldoc_comments = self._collect_pldoc_comments(text)
             self._ensure_parser(cleaned_text, directive_ops, module_name)
-            tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
-            parsed_items = [self._fold_numeric_unary_minus(item) for item in transformer.transform(tree)]
+            parsed_items: list[Clause | Directive] = []
+
+            # Parse each clause/directive separately to avoid Earley state explosion
+            # on large files with many clauses.
+            statements = tokenize_prolog_statements(cleaned_text)
+            search_pos = 0
+            for statement in statements:
+                # Track position of the statement within the cleaned text so that
+                # PlDoc association via start_pos still works.
+                stmt_pos = cleaned_text.find(statement, search_pos)
+                if stmt_pos == -1:
+                    raise RuntimeError(
+                        f"Could not re-locate tokenized statement in text: {statement!r}"
+                    )
+                search_pos = stmt_pos + len(statement)
+
+                stripped = statement.lstrip()
+                start_rule = "directive" if stripped.startswith(":-") else "clause"
+                try:
+                    tree = self.parser.parse(statement, start=start_rule)
+                except LarkError:
+                    tree = self.parser.parse(statement, start="start")
+                transformed = transformer.transform(tree)
+                if isinstance(transformed, list):
+                    parsed = transformed
+                else:
+                    parsed = [transformed]
+
+                items = [self._fold_numeric_unary_minus(item) for item in parsed]
+                for item in items:
+                    meta = getattr(item, "meta", None)
+                    if meta is not None and hasattr(meta, "start_pos"):
+                        meta.start_pos += stmt_pos
+                parsed_items.extend(items)
             # Associate PlDoc comments with items
             self._associate_pldoc_comments(parsed_items, pldoc_comments)
             return parsed_items
@@ -1752,7 +1856,7 @@ class PrologParser:
                 clause_text = self._apply_char_conversions(clause_text)
             cleaned_text, _ = self._collect_pldoc_comments(clause_text)
             self._ensure_parser(cleaned_text)
-            tree = self.parser.parse(cleaned_text)
+            tree = self.parser.parse(cleaned_text, start="start")
             transformer = PrologTransformer()
             result = transformer.transform(tree)
             if result and isinstance(result[0], Clause):
