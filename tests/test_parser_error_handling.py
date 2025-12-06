@@ -35,3 +35,17 @@ class TestParserErrorHandling:
         syntax_term = error_term.args[0]
         assert isinstance(syntax_term, Compound)
         assert syntax_term.functor == "syntax_error"
+
+    def test_empty_character_code_syntax_error(self):
+        """Test that empty character code 0'' raises syntax error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.query_once("X = 0''")
+
+        error_term = excinfo.value.term
+        assert isinstance(error_term, Compound)
+        assert error_term.functor == "error"
+        assert error_term.args[1] == Compound("context", (Atom("query/1"),))
+        syntax_term = error_term.args[0]
+        assert isinstance(syntax_term, Compound)
+        assert syntax_term.functor == "syntax_error"

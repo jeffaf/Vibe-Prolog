@@ -182,7 +182,7 @@ __OPERATOR_GRAMMAR__
     // Character codes: 0'X where X is any character (must come before NUMBER)
     // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex)
     // Allow trailing quote (e.g., 0'\\') while keeping legacy forms without it; allow broader alphanumerics after \\x so lexer does not reject malformed hex sequences that should become syntax errors
-    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\|\\\\['tnr]|''|[^'\\])'?/ | /\d+'.'/
+    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\|\\\\['tnr]|''|[^'\\])'?/ | /[1-9]\d*'.'/
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
@@ -617,11 +617,11 @@ class PrologTransformer(Transformer):
         return s
 
     def atom(self, items):
-        atom_str = str(items[0])
-        # Note: A single '.' is valid as an atom when used in expression context
-        # (e.g., as an argument to a functor). The clause splitter already ensures
-        # dots in parenthesized contexts are not treated as clause terminators.
-        # Handle SPECIAL_ATOM (quoted atoms like ';', '|', etc.)
+         atom_str = str(items[0])
+         # Note: A single '.' is valid as an atom when used in expression context
+         # (e.g., as an argument to a functor). The clause splitter already ensures
+         # dots in parenthesized contexts are not treated as clause terminators.
+         # Handle SPECIAL_ATOM (quoted atoms like ';', '|', etc.)
         if atom_str.startswith("'") and atom_str.endswith("'") and len(atom_str) >= 2:
             # Strip the quotes and handle escape sequences
             atom_str = atom_str[1:-1]
@@ -747,9 +747,8 @@ class PrologTransformer(Transformer):
             parts = code_str.split("'")
             if len(parts) >= 2:
                 if not parts[1]:
-                    # This case, e.g., from `16''`, would cause `ord('')` to crash.
-                    # Treating as an invalid char code for now to prevent a crash.
-                    return Number(0)
+                    # Empty character code - reject as syntax error
+                    raise ValueError("unexpected_char")
                 char = parts[1][0]
                 return Number(ord(char))
 
@@ -766,9 +765,9 @@ class PrologTransformer(Transformer):
             ):
                 char_part = char_part[:-1]
 
-            # Handle doubled quote escape ''
-            if char_part == "''":
-                return Number(ord("'"))
+            # Reject empty character codes, including 0''
+            if not char_part or char_part == "'" or char_part == "''":
+                raise ValueError("unexpected_char")
 
             # Handle backslash escape sequences
             if char_part.startswith("\\"):

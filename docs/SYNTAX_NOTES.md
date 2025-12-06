@@ -67,7 +67,7 @@ Vibe-Prolog supports the Edinburgh `<radix>'<number>` notation for bases 2-36:
 | Backslash | `0'\\` | 92 | ✅ Supported | Escaped backslash |
 | Single quote | `0'\'` | 39 | ✅ Supported | Escaped quote |
 | Double quote | `0'\"` | 34 | ✅ Supported | Escaped quote |
-| Empty | `0''` | 0 | ✅ Supported | Edge case: returns 0 |
+| Empty | `0''` | N/A | ❌ Rejected | Syntax error as per ISO |
 
 **Difference from Scryer-Prolog**: Vibe does not require a trailing backslash for hex/octal escapes.
 
@@ -112,6 +112,12 @@ Vibe-Prolog supports the Edinburgh `<radix>'<number>` notation for bases 2-36:
 - `\b` (backspace) - not supported in Vibe
 - `\v` (vertical tab) - not supported in Vibe
 - `\f` (form feed) - not supported in Vibe
+
+### Special Atom Cases
+
+| Feature | Example | Status | Notes |
+|---------|---------|--------|-------|
+| Bare dot atom | `phrase(upto_what(Bs0, .), Cs0, Ds).` | ✅ Supported | Dots inside terms no longer trigger clause-terminator errors |
 
 ## Operator Syntax
 
@@ -236,6 +242,7 @@ sentence(S0, S) :- noun_phrase(S0, S1), verb_phrase(S1, S).
 | DCG exports | `:- module(m, [rule//0]).` | ✅ Supported |
 | Import module | `:- use_module(library(lists)).` | ✅ Supported |
 | Selective import | `:- use_module(library(lists), [append/3]).` | ✅ Supported |
+| Consult library file | `consult(library(dcgs)).` | ✅ Supported |
 | Module-qualified call | `lists:append(X, Y, Z)` | ✅ Supported |
 | Module-qualified head | `user:term_expansion(X, Y) :- ...` | ✅ Supported |
 
@@ -407,10 +414,6 @@ These features are specific to Vibe-Prolog and may not be portable:
    :- endif.
    ```
 
-3. **Character code edge cases**:
-   ```prolog
-   0''    % Returns 0 (empty character)
-   ```
 
 ## Known Limitations
 

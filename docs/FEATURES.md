@@ -23,7 +23,7 @@ Status legend:
 | Strings (quoted)                 | ✅      | Consistent representation                 |
 | `%` line comments                | ✅      |                                           |
 | `/* … */` block comments         | ✅      | Nested supported; `/**` starts PlDoc comments |
-| Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
+| Character code syntax (`0'X`)    | ✅      | ISO-compliant - rejects empty literals    |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
 | Directive prefix operator `:-` (1200, fx) | ✅ | **ISO-required** - Prefix form for directives |
@@ -38,6 +38,7 @@ Status legend:
 | Operators as functor names (quoted) | ✅   | `';'(A, B)`, `'|'(X, Y)`, `':'(a, b)` work |
 | Operators as functor names (unquoted) | ✅ | `;(A, B)`, `|(X, Y)`, `:(a, b)` work |
 | Parenthesized operators as atoms | ✅      | `(;)`, `(|)`, `(,)`, `(->)` work |
+| Bare `.` atom inside terms        | ✅      | Supports constructs like `phrase(upto_what(Bs0, .), Cs0, Ds)` |
 
 ---
 
@@ -235,6 +236,20 @@ The following Scryer-Prolog specific directives are recognized but ignored (with
 | `bagof/3`   | ✅      | Correct quantification |
 | `setof/3`   | ✅      | ISO semantics          |
 
+## §8.14 — Definite Clause Grammars (DCGs)
+
+| Predicate / Feature          | Status | Notes                                                                 |
+| ---------------------------- | ------ | --------------------------------------------------------------------- |
+| DCG syntax (`-->`)           | ✅      | **ISO-required** - Full DCG syntax support                           |
+| `phrase/2`                   | ✅      | **ISO-compliant** - Complete list consumption with error handling    |
+| `phrase/3`                   | ✅      | **ISO-compliant** - Remainder support with error handling            |
+| Terminal lists as rulesets   | ✅      | `phrase([a, b, c], L)` unifies L with [a, b, c]                       |
+| Cut (`!`) as ruleset         | ✅      | `phrase(!, L)` unifies L with []                                      |
+| DCG expansion                | ✅      | Automatic conversion to standard Prolog clauses                       |
+| Embedded Prolog goals `{G}`  | ✅      | Full support for embedded goals in DCG rules                         |
+| Alternatives (`;`)           | ✅      | Choice points in DCG rules                                           |
+| Error handling               | ✅      | **ISO-compliant** - Proper instantiation_error, type_error, existence_error |
+
 ---
 
 ## Meta-Predicates & Control Flow Extensions
@@ -346,7 +361,7 @@ The following Scryer-Prolog specific directives are recognized but ignored (with
 
 | Predicate                             | Status | Notes                   |
 | ------------------------------------- | ------ | ----------------------- |
-| `current_predicate/1`                 | ✅      |                         |
+| `current_predicate/1`                 | ✅      | Module-qualified indicators (`module:Name/Arity`) supported |
 | `predicate_property/2`                | ⚠️     | Built-in detection only |
 | `dynamic/static/multifile` properties | ❌      | Needed for ISO tooling  |
 
@@ -427,6 +442,7 @@ Basic variant tabling is available via the `:- table` directive.
 | Built-ins visible in all modules  | ✅      |                                                                |
 | Clause body module resolution     | ✅      | Unqualified goals resolve via imports → defining module → user |
 | `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)`; library/ preferred over examples/modules/ for module resolution |
+| `consult/1` with `library(Name)`  | ✅      | `consult("library(dcgs)")` resolves via library search paths just like `use_module/1` |
 | **Operator exports in module/2**  | ✅      | **SWI-Prolog compatible - operators can be exported**          |
 | Imported operator discovery       | ✅      | Two-pass parsing: operators from `use_module` targets are pre-scanned and registered before parsing dependent code. Handles block comments, line comments, and recursive imports |
 | **Module-scoped predicate namespaces** | ✅  | Each module can define predicates with the same name/arity without conflict. `library(a):foo/1` and `library(b):foo/1` are distinct |
@@ -473,6 +489,17 @@ Common extensions frequently used in real-world Prolog programs:
 1. **List utilities** - ✅ Implemented: `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
 2. **Higher-order** - ✅ Implemented: `maplist/3-5`, `include/3`, `exclude/3`, `partition/4`, `foldl/4-6`
 3. **Constraint solving** - 📘 Available as libraries: CLP(Z) in [library/clpz.pl](../library/clpz.pl), CLP(B) in [library/clpb.pl](../library/clpb.pl)
+
+---
+
+## ISO Conformity Testing
+
+Vibe-Prolog is tested against the official ISO/IEC JTC1 SC22 WG17 conformity test suite:
+- 355 test cases covering syntax, operators, escapes, and numeric literals
+- Results tracked in [docs/CONFORMITY_TESTING.md](./CONFORMITY_TESTING.md)
+- Tests can be re-run with `uv run python tools/conformity_test.py`
+
+Current conformity: Run `uv run python tools/conformity_test.py` to see current results
 
 ---
 
