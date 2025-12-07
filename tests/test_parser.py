@@ -451,6 +451,53 @@ class TestComments:
         # Further assert the atom argument contains '/* not comment */'
         assert clauses[0].head.args[0].name == "/* not comment */"
 
+    def test_block_comment_touching_atom_start(self):
+        """Block comment immediately after atom start."""
+        parser = PrologParser()
+        clauses = parser.parse("atom/*comment*/.")
+        assert len(clauses) == 1
+        assert clauses[0].head.name == "atom"
+
+    def test_block_comment_touching_atom_end(self):
+        """Block comment immediately before atom end."""
+        parser = PrologParser()
+        clauses = parser.parse("/*comment*/atom.")
+        assert len(clauses) == 1
+        assert clauses[0].head.name == "atom"
+
+    def test_block_comment_touching_operator(self):
+        """Block comment adjacent to operator - needs space before graphic operators.
+        
+        Per ISO Prolog, '=/*' forms a graphic token because '=' is a graphic char.
+        Use spaces between operators and comments for portability.
+        """
+        parser = PrologParser()
+        # With spaces around operator - this works correctly
+        clauses = parser.parse("X /* comment */ = /* comment */ 5.")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "="
+        assert clauses[0].head.args[0].name == "X"
+        assert clauses[0].head.args[1] == Number(5)
+
+    def test_block_comment_touching_eof(self):
+        """Block comment at end of input - needs space after period.
+        
+        Per ISO Prolog, '.' followed directly by '/*' forms a graphic token './'.
+        A space is required between the clause terminator and the comment.
+        """
+        parser = PrologParser()
+        # With space between period and comment - this works
+        clauses = parser.parse("fact. /*comment*/")
+        assert len(clauses) == 1
+        assert clauses[0].head.name == "fact"
+
+    def test_block_comment_with_quotes_and_operators(self):
+        """Block comment containing quotes and operators."""
+        parser = PrologParser()
+        clauses = parser.parse("/* 'quote' + - */fact.")
+        assert len(clauses) == 1
+        assert clauses[0].head.name == "fact"
+
 
 class TestStrings:
     """Tests for parsing strings."""
@@ -846,6 +893,108 @@ class TestCharacterCodeHexEscapes:
         parser = PrologParser()
         with pytest.raises(PrologThrow, match="syntax_error"):
             parser.parse("code(0'\\x4G).")
+
+
+class TestISOConformityBlockComments:
+    """Tests for ISO conformity with block comments as whitespace."""
+
+    def test_block_comment_inside_arg(self):
+        """Test block comment between argument tokens parses correctly.
+        
+        Block comments act as whitespace, so writeq(a/* */). becomes writeq(a ).
+        which is valid Prolog.
+        """
+        parser = PrologParser()
+        clauses = parser.parse("writeq(a/* */).")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "writeq"
+        assert clauses[0].head.args[0].name == "a"
+
+    def test_block_comment_between_args(self):
+        """Test block comment between arguments parses correctly.
+        
+        The comment acts as whitespace between tokens.
+        """
+        parser = PrologParser()
+        clauses = parser.parse("foo(a/* . */,b).")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "foo"
+        assert clauses[0].head.args[0].name == "a"
+        assert clauses[0].head.args[1].name == "b"
+
+    def test_floating_literal_with_block_comment(self):
+        """Test floating literal with block comment."""
+        parser = PrologParser()
+        clauses = parser.parse("X/**/is/**/3.14.")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "is"
+        assert clauses[0].head.args[1] == Number(3.14)
+
+    def test_unary_minus_with_block_comment(self):
+        """Test unary minus with block comment."""
+        parser = PrologParser()
+        clauses = parser.parse("X/**/is/**/-42.")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "is"
+        assert clauses[0].head.args[1] == Number(-42)
+
+    def test_list_with_block_comment(self):
+        """Test list starting with block comment."""
+        parser = PrologParser()
+        clauses = parser.parse("/**/ [1,2,3].")
+        assert len(clauses) == 1
+        assert isinstance(clauses[0].head, List)
+        assert len(clauses[0].head.elements) == 3
+
+    def test_toplevel_with_block_comment(self):
+        """Test toplevel clause starting with block comment."""
+        parser = PrologParser()
+        clauses = parser.parse("/**/ fact.")
+        assert len(clauses) == 1
+        assert clauses[0].head.name == "fact"
+
+
+class TestISOConformityGraphicOperators:
+    """Tests for ISO conformity with graphic operators containing /*, */.
+    
+    ISO tests #48-49 require that graphic tokens like //* are not split
+    and treated as block comment starts.
+    """
+
+    def test_double_slash_star_operator(self):
+        """ISO test #48: writeq(//*). should parse without 'Unterminated block comment'.
+        
+        The key requirement is that /* after / does NOT start a comment because
+        the / is a graphic character. The actual parsing of //* may vary by
+        implementation (could be atom //* or expression /(/, *)).
+        """
+        parser = PrologParser()
+        clauses = parser.parse("writeq(//*).") 
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "writeq"
+        # The argument may be parsed as atom or as binary / applied to / and *
+
+    def test_nested_graphic_operator(self):
+        """ISO test #49: writeq(//*./*/).  should parse as two graphic tokens.
+        
+        Both //* and /*/ are graphic operator tokens.
+        """
+        parser = PrologParser()
+        clauses = parser.parse("writeq(//*./*/).")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "writeq"
+
+    def test_single_slash_comment_start(self):
+        """A single / followed by /* should recognize the comment.
+        
+        Unlike //* where // is already a graphic prefix, a lone / followed by 
+        a space and then /* should recognize the comment.
+        """
+        parser = PrologParser()
+        # foo(/ /* comment */) - the / is an operator, /* starts comment
+        clauses = parser.parse("foo(/ /* comment */).")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "foo"
 
 
 class TestComplexExamples:

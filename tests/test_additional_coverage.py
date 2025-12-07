@@ -316,3 +316,33 @@ class TestDivisionEdgeCases:
         result = prolog.query_once("X is 15 mod 5")
         assert result is not None
         assert result['X'] == 0
+
+
+class TestLibraryLoadingRegression:
+    """Regression tests for library loading with block comments."""
+
+    @pytest.mark.performance
+    def test_ordsets_library_loads(self):
+        """Test that library/ordsets.pl loads without 'No terminal matches' error.
+        
+        The key issue was that '/* R2 = (=) */ true' caused a syntax error because
+        the block comment was not properly stripped before 'true'. This test verifies
+        that the library can be consulted without the comment-related syntax error.
+        """
+        prolog = PrologInterpreter()
+        # This should not raise a syntax error related to block comments
+        prolog.consult("library/ordsets.pl")
+        # The library loads - predicate functionality depends on other built-ins
+        # that may not be fully implemented, so we just verify no syntax error
+
+    @pytest.mark.performance
+    def test_ugraphs_library_loads(self):
+        """Test that library/ugraphs.pl loads without 'No terminal matches' error.
+        
+        Similar to ordsets.pl, this library had the same '/* ... */ true' pattern
+        that caused syntax errors.
+        """
+        prolog = PrologInterpreter()
+        # This should not raise a syntax error related to block comments
+        prolog.consult("library/ugraphs.pl")
+        # The library loads - predicate functionality depends on other built-ins

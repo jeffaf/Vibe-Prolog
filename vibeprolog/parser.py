@@ -12,6 +12,27 @@ from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.operator_defaults import DEFAULT_OPERATORS
 from vibeprolog.terms import Atom, Variable, Number, Compound
 
+# ISO Prolog graphic characters that can form operators
+# When /* is immediately preceded by one of these, it's part of an operator token, not a comment
+GRAPHIC_CHARS = set('#$&*+-./:<=>?@^~\\')
+
+
+def _is_graphic_char(ch: str) -> bool:
+    """Return True if ch is an ISO Prolog graphic character."""
+    return ch in GRAPHIC_CHARS
+
+
+def _should_start_block_comment(text: str, index: int, prev_char: str | None) -> bool:
+    """Return True if /* at ``index`` starts a block comment based on context."""
+
+    # Graphic operators like //* rely on the preceding slash to keep the token intact.
+    if prev_char == '/':
+        return False
+    # Graphic operators like /*/ must remain intact even when not preceded by '/'.
+    if text.startswith('/*/', index):
+        return False
+    return True
+
 
 @dataclass(frozen=True)
 class List:
@@ -207,6 +228,8 @@ __OPERATOR_GRAMMAR__
     %import common.WS
     %ignore WS
     %ignore /%.*/  // Line comments
+    // Block comments are handled by Python pre-processing in _collect_pldoc_comments
+    // which properly handles nesting, PlDoc, and the slash-prefix guard rules
 """
 
 
@@ -892,6 +915,7 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
             i += 1
             continue
 
+
         # Handle escape sequences
         if escape_next:
             current.append(char)
@@ -950,29 +974,33 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
                 current.append(char)
                 i += 1
                 continue
+            # Check for block comment start: /* only starts a comment if NOT preceded
+            # by '/' and not part of the literal '/*/'. E.g., '//*' and '/*/' remain operators.
             if prolog_code[i:i+2] == '/*':
-                if not has_code and not current:
-                    # Skip standalone block comments before any code in this chunk.
-                    depth = 1
+                prev_char = prolog_code[i-1] if i > 0 else None
+                if _should_start_block_comment(prolog_code, i, prev_char):
+                    if not has_code and not current:
+                        # Skip standalone block comments before any code in this chunk.
+                        depth = 1
+                        i += 2
+                        while i < len(prolog_code) and depth > 0:
+                            if prolog_code[i:i+2] == '/*':
+                                depth += 1
+                                i += 2
+                                continue
+                            if prolog_code[i:i+2] == '*/':
+                                depth -= 1
+                                i += 2
+                                continue
+                            i += 1
+                        if depth > 0:
+                            raise ValueError("Unterminated block comment")
+                        continue
+                    in_block_comment = 1
+                    current.append(char)
+                    current.append(prolog_code[i+1])
                     i += 2
-                    while i < len(prolog_code) and depth > 0:
-                        if prolog_code[i:i+2] == '/*':
-                            depth += 1
-                            i += 2
-                            continue
-                        if prolog_code[i:i+2] == '*/':
-                            depth -= 1
-                            i += 2
-                            continue
-                        i += 1
-                    if depth > 0:
-                        raise ValueError("Unterminated block comment")
                     continue
-                in_block_comment = 1
-                current.append(char)
-                current.append(prolog_code[i+1])
-                i += 2
-                continue
 
         # Track nesting depth for parentheses, brackets, braces
         if not in_single_quote and not in_double_quote:
@@ -1036,12 +1064,12 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
         i += 1
 
     # Check for unclosed comments or strings at end of code
-    if in_block_comment > 0:
-        raise ValueError("Unterminated block comment")
     if in_single_quote:
         raise ValueError("Unterminated quoted atom")
     if in_double_quote:
         raise ValueError("Unterminated string")
+    if in_block_comment > 0:
+        raise ValueError("Unterminated block comment")
     
     # Add any remaining content (should not happen in well-formed code)
     if current:
@@ -1188,11 +1216,17 @@ def _strip_comments(text: str) -> str:
         
         # Check for comment starts outside quoted strings
         if not in_single_quote and not in_double_quote:
-            # Check for block comment start
+            # Check for block comment start: /* only starts a comment if NOT preceded
+            # by '/' and not part of the literal '/*/'.
             if text[i:i+2] == '/*':
-                block_depth = 1
-                i += 2
-                continue
+                prev_char = result[-1] if result else None
+                if _should_start_block_comment(text, i, prev_char):
+                    block_depth = 1
+                    i += 2
+                    # Insert a space to prevent token gluing after the comment
+                    # (e.g., /* comment */true should become ' true' not 'true' glued to prior token)
+                    result.append(' ')
+                    continue
             # Check for line comment
             if char == '%':
                 # Skip until end of line
@@ -1238,9 +1272,12 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
         for op_name in operator_names:
             operators.append((precedence, op_type, op_name))
 
-    for statement in tokenize_prolog_statements(source):
-        # Strip comments before matching to handle block comments at start of statement
-        stripped = _strip_comments(statement).strip()
+    # Strip comments once before tokenizing so the tokenizer never sees unterminated
+    # quoted atoms that only occur inside comments (e.g., documentation blocks).
+    cleaned_source = _strip_comments(source)
+
+    for statement in tokenize_prolog_statements(cleaned_source):
+        stripped = statement.strip()
         
         # Check for op/3 directives
         match = directive_pattern.match(stripped)
@@ -1592,15 +1629,25 @@ class PrologParser:
         in_double_quote = False
         escape_next = False
         while i < len(text):
-            if not in_single_quote and not in_double_quote and (text.startswith('/*', i) or text.startswith('/**', i) or text.startswith('/*!', i)):
+            if not in_single_quote and not in_double_quote and text.startswith('/*', i):
+                prev_char = result[-1] if result else None
+                if not _should_start_block_comment(text, i, prev_char):
+                    # Not a comment, just part of an operator
+                    result.append(text[i])
+                    i += 1
+                    continue
+                
                 comment_start = i
                 depth = 1
-                if text.startswith('/**', i) or text.startswith('/*!', i):
+                # PlDoc comments start with /** or /*! but NOT /**/ (which is empty block)
+                is_pldoc = (
+                    (text.startswith('/**', i) and not text.startswith('/**/', i))
+                    or (text.startswith('/*!', i) and not text.startswith('/*!/', i))
+                )
+                if is_pldoc:
                     i += 3  # Skip /** or /*!
-                    is_pldoc = True
                 else:
                     i += 2  # Skip /*
-                    is_pldoc = False
                 comment_content = []
                 while i < len(text) and depth > 0:
                     if text.startswith('/*', i):
@@ -1613,6 +1660,8 @@ class PrologParser:
                             if is_pldoc:
                                 pldoc_comments.append((comment_start, ''.join(comment_content)))
                             i += 2
+                            # Insert a space to prevent token gluing
+                            result.append(' ')
                             break
                         else:
                             i += 2
@@ -1661,32 +1710,42 @@ class PrologParser:
                     i = end + 1 if end < len(text) else len(text)
                     continue
                 elif text.startswith('/*', i):
-                    # Block comment
-                    pos = len(''.join(cleaned))
-                    is_pldoc = text.startswith('/**', i) or text.startswith('/*!', i)
-                    i += 3 if is_pldoc else 2
-                    comment_content = []
-                    depth = 1
-                    while i < len(text) and depth > 0:
-                        if text.startswith('/*', i):
-                            depth += 1
-                            i += 2
-                        elif text.startswith('*/', i):
-                            depth -= 1
-                            if depth == 0:
-                                if is_pldoc:
-                                    pldoc_comments.append((pos, ''.join(comment_content)))
+                    # Block comment: /* only starts a comment if NOT preceded by '/'
+                    # and not part of the literal '/*/'.
+                    prev_char = cleaned[-1] if cleaned else None
+                    if _should_start_block_comment(text, i, prev_char):
+                        # Block comment
+                        pos = len(''.join(cleaned))
+                        # PlDoc comments start with /** or /*! but NOT /**/ (which is empty block)
+                        is_pldoc = (
+                            (text.startswith('/**', i) and not text.startswith('/**/', i))
+                            or (text.startswith('/*!', i) and not text.startswith('/*!/', i))
+                        )
+                        i += 3 if is_pldoc else 2
+                        comment_content = []
+                        depth = 1
+                        while i < len(text) and depth > 0:
+                            if text.startswith('/*', i):
+                                depth += 1
                                 i += 2
-                                break
+                            elif text.startswith('*/', i):
+                                depth -= 1
+                                if depth == 0:
+                                    if is_pldoc:
+                                        pldoc_comments.append((pos, ''.join(comment_content)))
+                                    i += 2
+                                    # Insert a space to prevent token gluing
+                                    cleaned.append(' ')
+                                    break
+                                else:
+                                    i += 2
                             else:
-                                i += 2
-                        else:
-                            if is_pldoc:
-                                comment_content.append(text[i])
-                            i += 1
-                    if depth > 0:
-                        raise ValueError("Unterminated block comment")
-                    continue
+                                if is_pldoc:
+                                    comment_content.append(text[i])
+                                i += 1
+                        if depth > 0:
+                            raise ValueError("Unterminated block comment")
+                        continue
             # Not in comment, add char
             cleaned.append(text[i])
             if escape_next:

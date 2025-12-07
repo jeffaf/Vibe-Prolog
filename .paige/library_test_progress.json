@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-05T17:57:22.502195",
+  "timestamp": "2025-12-06T18:10:56.775090",
   "results": {
     "library/$project_atts.pl": {
       "success": true,
@@ -67,6 +67,251 @@
       "detailed_msg": ""
     },
     "library/debug.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/diag.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/dif.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/error.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/ffi.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/files.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/format.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/freeze.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/gensym.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/http/http_open.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/http/http_server.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/iso_ext.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/lambda.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/lists.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/loader.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/numerics/quadtests.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/numerics/special_functions.pl": {
+      "success": false,
+      "short_msg": "\u274c Prolog error",
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches '\u03b4' in the current parser context, at line 11 col 16\n\n              ,\u03b4_inverses_t/5\n               ^\nExpected one of: \n\t* SPECIAL_ATOM\n\t* OP_SYMBOL\n\t* PREFIX_FY_900_45\n\t* STRING\n\t* CHAR_CODE\n\t* NUMBER\n\t* VARIABLE\n\t* PREFIX_FX_700_44\n\t* ARITH_OP_FUNCTOR\n\t* INFIX_OP_FUNCTOR\n\t* LBRACE\n\t* INFIX_YFX_500_16\n\t* PREFIX_FY_200_4\n\t* PREFIX_FX_1150_50\n\t* LPAR\n\t* SPECIAL_ATOM_OPS\n\t* PREFIX_FX_1200_53\n\t* CONTROL_OP_FUNCTOR\n\t* OPERATOR_ATOM\n\t* PREFIX_FX_1200_54\n\t* ATOM\n\t* BANG\n\t* LSQB\n\t* PREFIX_FY_200_3\n\t* COMPARISON_OP_FUNCTOR\n), context(consult/1))"
+    },
+    "library/numerics/testutils.pl": {
+      "success": false,
+      "short_msg": "\u274c Prolog error",
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches '\u03b4' in the current parser context, at line 11 col 16\n\n              ,\u03b4_inverses_t/5\n               ^\nExpected one of: \n\t* SPECIAL_ATOM\n\t* OP_SYMBOL\n\t* PREFIX_FY_900_45\n\t* STRING\n\t* CHAR_CODE\n\t* NUMBER\n\t* VARIABLE\n\t* PREFIX_FX_700_44\n\t* ARITH_OP_FUNCTOR\n\t* INFIX_OP_FUNCTOR\n\t* LBRACE\n\t* INFIX_YFX_500_16\n\t* PREFIX_FY_200_4\n\t* PREFIX_FX_1150_50\n\t* LPAR\n\t* SPECIAL_ATOM_OPS\n\t* PREFIX_FX_1200_53\n\t* CONTROL_OP_FUNCTOR\n\t* OPERATOR_ATOM\n\t* PREFIX_FX_1200_54\n\t* ATOM\n\t* BANG\n\t* LSQB\n\t* PREFIX_FY_200_3\n\t* COMPARISON_OP_FUNCTOR\n), context(consult/1))"
+    },
+    "library/ops_and_meta_predicates.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/ordsets.pl": {
+      "success": false,
+      "short_msg": "\u274c Prolog error",
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_YFX_400_6\n\t* INFIX_XFY_1000_46\n\t* INFIX_YFX_400_9\n\t* INFIX_YFX_400_12\n\t* INFIX_YFX_500_18\n\t* INFIX_YFX_500_15\n\t* INFIX_XFX_450_14\n\t* INFIX_XFX_1200_50\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_1\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_500_16\n\t* INFIX_YFX_400_8\n\t* INFIX_XFX_1200_51\n\t* INFIX_YFX_400_13\n\t* INFIX_XFY_1100_48\n\t* LPAR\n\t* INFIX_XFY_600_19\n\t* INFIX_XFY_1050_47\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_400_11\n\t* INFIX_YFX_400_7\n\t* RPAR\n\t* INFIX_YFX_400_5\n), context(consult/1))"
+    },
+    "library/os.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/pairs.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/pio.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/process.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/queues.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/random.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/reif.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/serialization/abnf.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/serialization/json.pl": {
+      "success": false,
+      "short_msg": "\u274c Parse error",
+      "detailed_msg": "ValueError: Unsupported DCG goal: NumberChars"
+    },
+    "library/sgml.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/si.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/simplex.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/sockets.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/tabling/batched_worklist.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/tabling/double_linked_list.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/tabling/global_worklist.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/tabling/table_data_structure.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/tabling/table_link_manager.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/tabling/trie.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/tabling/wrapper.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/tabling.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/terms.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/test_module.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/time.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/tls.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/ugraphs.pl": {
+      "success": false,
+      "short_msg": "\u274c Prolog error",
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_YFX_400_6\n\t* INFIX_XFY_1000_46\n\t* INFIX_YFX_400_9\n\t* INFIX_YFX_400_12\n\t* INFIX_YFX_500_18\n\t* INFIX_YFX_500_15\n\t* INFIX_XFX_450_14\n\t* INFIX_XFX_1200_50\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_1\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_500_16\n\t* INFIX_YFX_400_8\n\t* INFIX_XFX_1200_51\n\t* INFIX_YFX_400_13\n\t* INFIX_XFY_1100_48\n\t* LPAR\n\t* INFIX_XFY_600_19\n\t* INFIX_XFY_1050_47\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_400_11\n\t* INFIX_YFX_400_7\n\t* RPAR\n\t* INFIX_YFX_400_5\n), context(consult/1))"
+    },
+    "library/uuid.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/wasm.pl": {
+      "success": true,
+      "short_msg": "\u2705 Loaded successfully",
+      "detailed_msg": ""
+    },
+    "library/when.pl": {
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
+    },
+    "library/xpath.pl": {
       "success": false,
       "short_msg": "\u274c Timeout",
       "detailed_msg": "File loading exceeded 30 seconds"

@@ -22,7 +22,7 @@ Status legend:
 | Compound terms                   | ✅      |                                           |
 | Strings (quoted)                 | ✅      | Consistent representation                 |
 | `%` line comments                | ✅      |                                           |
-| `/* … */` block comments         | ✅      | Nested supported; `/**` starts PlDoc comments |
+| `/* … */` block comments         | ✅      | Treated as whitespace; nested supported; `/**` starts PlDoc comments; `/*` after graphic char is part of operator (e.g., `//*`) |
 | Character code syntax (`0'X`)    | ✅      | ISO-compliant - rejects empty literals    |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |

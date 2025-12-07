@@ -259,13 +259,28 @@ sentence(S0, S) :- noun_phrase(S0, S1), verb_phrase(S1, S).
 | Nested blocks | `/* outer /* inner */ */` | ✅ Supported |
 | Multi-line blocks | `/* Line 1\n   Line 2 */` | ✅ Supported |
 
+**Block comments as whitespace**: Block comments (`/* ... */`) are treated exactly like whitespace by the lexer. After the closing `*/`, tokenization resumes as if a space was present, regardless of the next character. This ensures compatibility with ISO Prolog standards and prevents parsing errors when comments appear adjacent to tokens.
+
+**Graphic character prefix rule**: `/*` only starts a block comment when NOT immediately preceded by a graphic character (`#$&*+-./:<=>?@^~\`). When preceded by a graphic character, the `/*` is part of the operator token. This matches ISO Prolog behavior.
+
+**Examples**:
+```prolog
+atom/*comment*/.        % Caution: './*' forms graphic token - use space
+atom. /*comment*/       % Valid: space separates clause terminator from comment
+/*comment*/atom.        % Valid: comment acts as whitespace before atom
+X/*comment*/=/*comment*/5.  % Valid: comments separate tokens
+/*comment*/[1,2,3].     % Valid: comment before list
+writeq(//*).            % Valid: //* is a graphic operator, not a comment
+writeq(//*./*/).        % Valid: //* and /*/ are both graphic operators
+```
+
 **Note**: Comments are properly handled in all contexts, including:
 - Inside clauses
 - Between terms
 - In module declarations
 - Within operator definitions
 
-The parser correctly distinguishes `.` as a clause terminator from `.` inside comments, floats, or parentheses.
+The parser correctly distinguishes `.` as a clause terminator from `.` inside comments, floats, or parentheses. However, `./*` without whitespace forms a graphic token, so always put a space between the clause terminator `.` and a following block comment.
 
 ## Directive Syntax
 
