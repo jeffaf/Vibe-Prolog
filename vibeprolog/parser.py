@@ -616,8 +616,10 @@ class PrologTransformer(Transformer):
     def _parse_escape_sequence(self, s, pos):
         """Parse a single escape sequence starting at pos in string s.
 
-        Returns (char, new_pos) where char is the resulting character, or
-        raises ValueError on invalid escape sequences.
+        Returns (char_code, new_pos) where char_code is the Unicode code point,
+        and new_pos is the position after the escape sequence.
+
+        Raises ValueError for invalid escape sequences.
         """
         if pos >= len(s) or s[pos] != '\\':
             raise ValueError("Not an escape sequence")
@@ -641,7 +643,7 @@ class PrologTransformer(Transformer):
                 else:
                     break
             code = int(digits, 8)
-            return chr(code), pos
+            return code, pos
 
         # Hex escapes: \x followed by one or more hex digits
         if ch == 'x':
@@ -658,7 +660,7 @@ class PrologTransformer(Transformer):
                 else:
                     break
             code = int(digits, 16)
-            return chr(code), pos
+            return code, pos
 
         # Unicode escapes: \uXXXX (exactly 4 hex digits)
         if ch == 'u':
@@ -669,20 +671,29 @@ class PrologTransformer(Transformer):
                 raise ValueError("Invalid Unicode escape")
             code = int(digits, 16)
             pos += 4
-            return chr(code), pos
+            return code, pos
 
-        # Single-character escapes
+        # Single character escapes
         single_char_escapes = {
-            'a': 7, 'b': 8, 'd': 127, 'e': 27, 'f': 12,
-            'n': 10, 'r': 13, 's': 32, 't': 9, 'v': 11,
-            "'": ord("'"), '"': ord('"'), '\\': ord('\\'),
+            'a': 7,   # alert (bell)
+            'b': 8,   # backspace
+            'c': -1,  # no output (used in writeq)
+            'd': 127, # delete
+            'e': 27,  # escape
+            'f': 12,  # form feed
+            'n': 10,  # newline
+            'r': 13,  # carriage return
+            's': 32,  # space
+            't': 9,   # tab
+            'v': 11,  # vertical tab
+            "'": ord("'"),  # escaped single quote
+            '"': ord('"'),  # escaped double quote
+            '\\': ord('\\'), # escaped backslash
         }
         if ch in single_char_escapes:
             code = single_char_escapes[ch]
-            return chr(code), pos
-        if ch == 'c':
-            # \c is not valid in string escapes or char literals in this implementation
-            raise ValueError("Invalid escape: \\c")
+            return code, pos
+
         raise ValueError(f"Unknown escape: \\{ch}")
 
     def _unescape_string(self, s):
@@ -691,8 +702,9 @@ class PrologTransformer(Transformer):
         i = 0
         while i < len(s):
             if s[i] == '\\':
-                ch, i = self._parse_escape_sequence(s, i)
-                res.append(ch)
+                code, i = self._parse_escape_sequence(s, i)
+                if code != -1:  # \c produces no output
+                    res.append(chr(code))
             else:
                 res.append(s[i])
                 i += 1
@@ -857,11 +869,11 @@ class PrologTransformer(Transformer):
                     code, new_pos = self._parse_escape_sequence(char_part, 0)
                     if new_pos != len(char_part):
                         raise ValueError("trailing characters after escape sequence")
-                    # \c is ignored in strings but is not a valid character code literal.
+                    # \c is invalid in a char code literal
                     if char_part == '\\c':
-                        raise ValueError("invalid character code: \\c")
+                        raise ValueError("invalid_escape")
                     return Number(code)
-                except ValueError as e:
+                except ValueError:
                     raise ValueError("unexpected_char")
 
             # Regular character
@@ -891,6 +903,7 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
     in_double_quote = False
     in_line_comment = False
     in_block_comment = 0
+    in_char_code = False
     escape_next = False
     has_code = False
     paren_depth = 0
@@ -975,27 +988,36 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
         # Handle entering/exiting quotes
         if char == "'" and not in_double_quote:
             has_code = True
-            if not in_single_quote and (
-                (i > 0 and prolog_code[i - 1] == "0")
-                or _is_edinburgh_radix_quote(i)
-            ):
-                # Character code literal (e.g., 0'a, 0'\x41\) uses a leading
-                # single quote but does not introduce a quoted atom scope.
-                # Edinburgh radix numbers (<radix>'<digits>) likewise should
-                # not open quoted atom mode.
+            if in_single_quote:
+                # Check for doubled quote
+                if i + 1 < len(prolog_code) and prolog_code[i + 1] == "'":
+                    current.append(char)
+                    current.append(prolog_code[i + 1])
+                    i += 2
+                    continue
+                # Closing quote
+                in_single_quote = False
                 current.append(char)
                 i += 1
                 continue
-            # Check for doubled quote
-            if in_single_quote and i + 1 < len(prolog_code) and prolog_code[i + 1] == "'":
+            elif in_char_code:
+                # Closing char code
+                in_char_code = False
                 current.append(char)
-                current.append(prolog_code[i + 1])
-                i += 2
+                i += 1
                 continue
-            in_single_quote = not in_single_quote
-            current.append(char)
-            i += 1
-            continue
+            elif (i > 0 and prolog_code[i - 1] == "0") or _is_edinburgh_radix_quote(i):
+                # Starting char code
+                in_char_code = True
+                current.append(char)
+                i += 1
+                continue
+            else:
+                # Starting quoted atom
+                in_single_quote = True
+                current.append(char)
+                i += 1
+                continue
 
         if char == '"' and not in_single_quote:
             has_code = True

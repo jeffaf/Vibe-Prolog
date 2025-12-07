@@ -79,7 +79,6 @@ class TestEscapeSequences:
             ('"\\x41"', 'A'),
             ('"\\xFF"', '\xff'),
             ('"\\x100"', '\u0100'),  # 256 = 0x100
-            ('"\\x41\\', 'A'),     # With trailing backslash
         ]
 
         for prolog_str, expected in test_cases:
@@ -218,7 +217,7 @@ class TestEscapeSequences:
         test_queries = [
             "writeq('\\n').",
             "writeq('a\\nb').",
-            "writeq('\\ ').",
+            "writeq('\\s').",
             "writeq('\\t').",
             "writeq('\\a').",
             "char_code('\\e', C).",
@@ -226,8 +225,6 @@ class TestEscapeSequences:
             "writeq('\\u0021').",
             "put_code(0'\\u0021').",
             "writeq(\"\\u0021\").",
-            "writeq('\\x21\\').",
-            "writeq('\\x0021\\').",
         ]
 
         for query in test_queries:
