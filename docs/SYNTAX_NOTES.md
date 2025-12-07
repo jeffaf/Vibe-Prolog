@@ -97,21 +97,27 @@ Vibe-Prolog supports the Edinburgh `<radix>'<number>` notation for bases 2-36:
 
 ### Escape Sequences
 
+Vibe-Prolog supports all ISO/IEC 13211-1 escape sequences:
+
 | Escape | Meaning | Example | Status |
 |--------|---------|---------|--------|
 | `\'` | Single quote | `'it\'s'` or `'it''s'` | ✅ Supported |
 | `\"` | Double quote | `"say \"hi\""` | ✅ Supported |
 | `\\` | Backslash | `'\\'` | ✅ Supported |
-| `\n` | Newline (LF) | `'\n'` | ✅ Supported |
-| `\r` | Carriage return (CR) | `'\r'` | ✅ Supported |
-| `\t` | Tab | `'\t'` | ✅ Supported |
-| `\xHH` | Hex character code | `'\x41'` (A) | ✅ Supported |
-
-**Missing from Scryer-Prolog**:
-- `\a` (alert/bell) - not supported in Vibe
-- `\b` (backspace) - not supported in Vibe
-- `\v` (vertical tab) - not supported in Vibe
-- `\f` (form feed) - not supported in Vibe
+| `\a` | Alert/bell (7) | `'\a'` | ✅ Supported |
+| `\b` | Backspace (8) | `'\b'` | ✅ Supported |
+| `\c` | No output (used in writeq) | `'\c'` | ✅ Supported |
+| `\d` | Delete (127) | `'\d'` | ✅ Supported |
+| `\e` | Escape (27) | `'\e'` | ✅ Supported |
+| `\f` | Form feed (12) | `'\f'` | ✅ Supported |
+| `\n` | Newline (LF, 10) | `'\n'` | ✅ Supported |
+| `\r` | Carriage return (CR, 13) | `'\r'` | ✅ Supported |
+| `\s` | Space (32) | `'\s'` | ✅ Supported |
+| `\t` | Tab (9) | `'\t'` | ✅ Supported |
+| `\v` | Vertical tab (11) | `'\v'` | ✅ Supported |
+| `\0...\777` | Octal character code | `'\141'` (a) | ✅ Supported |
+| `\xHH...` | Hex character code | `'\x41'` (A) | ✅ Supported |
+| `\uXXXX` | Unicode character code | `'\u0041'` (A) | ✅ Supported |
 
 ### Special Atom Cases
 

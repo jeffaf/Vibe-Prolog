@@ -201,9 +201,9 @@ __OPERATOR_GRAMMAR__
     cut: "!"
 
     // Character codes: 0'X where X is any character (must come before NUMBER)
-    // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex)
-    // Allow trailing quote (e.g., 0'\\') while keeping legacy forms without it; allow broader alphanumerics after \\x so lexer does not reject malformed hex sequences that should become syntax errors
-    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\|\\\\['tnr]|''|[^'\\])'?/ | /[1-9]\d*'.'/
+    // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex), etc.
+    // Allow trailing quote (e.g., 0'\\') while keeping legacy forms without it
+    CHAR_CODE.5: /0'([^'\\]|\\[^']*|'')*'?/ | /[1-9]\d*'.'/
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
@@ -613,31 +613,120 @@ class PrologTransformer(Transformer):
             s = self._unescape_string(s)
         return Atom(s, quoted=True)
 
-    def _unescape_string(self, s):
-        """Handle backslash escape sequences."""
-        # Process escape sequences in the correct order
-        # Double backslash must be processed LAST to avoid interfering with other escapes
-        # We use a placeholder to preserve \\
+    def _parse_escape_sequence(self, s, pos):
+        """Parse a single escape sequence starting at pos in string s.
 
-        # First, temporarily replace \\ with a placeholder
-        placeholder = "\x00BACKSLASH\x00"
-        s = s.replace(r"\\", placeholder)
+        Returns (char_code, new_pos) where char_code is the Unicode code point,
+        and new_pos is the position after the escape sequence.
 
-        # Now handle other escape sequences
-        replacements = {
-            r"\'": "'",
-            r"\"": '"',
-            r"\n": "\n",
-            r"\t": "\t",
-            r"\r": "\r",
+        Raises ValueError for invalid escape sequences.
+        """
+        if pos >= len(s) or s[pos] != '\\':
+            raise ValueError("Not an escape sequence")
+
+        pos += 1  # Skip the backslash
+
+        if pos >= len(s):
+            raise ValueError("Incomplete escape sequence")
+
+        ch = s[pos]
+        pos += 1
+
+        # Single character escapes
+        single_char_escapes = {
+            'a': 7,   # alert (bell)
+            'b': 8,   # backspace
+            'c': None,  # no output (used in writeq)
+            'd': 127, # delete
+            'e': 27,  # escape
+            'f': 12,  # form feed
+            'n': 10,  # newline
+            'r': 13,  # carriage return
+            's': 32,  # space
+            't': 9,   # tab
+            'v': 11,  # vertical tab
+            "'": ord("'"),  # escaped single quote
+            '"': ord('"'),  # escaped double quote
+            '\\': ord('\\'), # escaped backslash
         }
-        for escaped, unescaped in replacements.items():
-            s = s.replace(escaped, unescaped)
 
-        # Finally, replace placeholder with single backslash
-        s = s.replace(placeholder, "\\")
+        if ch in single_char_escapes:
+            code = single_char_escapes[ch]
+            if code is None:  # \c - no output
+                return 0, pos  # Return null character for no output
+            return code, pos
 
-        return s
+        # Octal escape: \ followed by 1-3 octal digits
+        if ch in '01234567':
+            # Collect up to 3 octal digits
+            octal_str = ch
+            for i in range(2):
+                if pos < len(s) and s[pos] in '01234567':
+                    octal_str += s[pos]
+                    pos += 1
+                else:
+                    break
+            try:
+                return int(octal_str, 8), pos
+            except ValueError:
+                raise ValueError(f"Invalid octal escape: \\{octal_str}")
+
+        # Hex escape: \x followed by hex digits, optionally ended by \
+        if ch == 'x':
+            hex_str = ""
+            while pos < len(s):
+                if s[pos] in '0123456789abcdefABCDEF':
+                    hex_str += s[pos]
+                    pos += 1
+                elif s[pos] == '\\':
+                    pos += 1  # Skip the closing backslash
+                    break
+                else:
+                    break
+            if not hex_str:
+                raise ValueError("Hex escape sequence missing digits")
+            try:
+                return int(hex_str, 16), pos
+            except ValueError:
+                raise ValueError(f"Invalid hex escape: \\x{hex_str}")
+
+        # Unicode escape: \u followed by exactly 4 hex digits
+        if ch == 'u':
+            if pos + 4 > len(s):
+                raise ValueError("Unicode escape sequence too short")
+            hex_str = s[pos:pos+4]
+            pos += 4
+            if not all(c in '0123456789abcdefABCDEF' for c in hex_str):
+                raise ValueError(f"Invalid Unicode escape: \\u{hex_str}")
+            try:
+                return int(hex_str, 16), pos
+            except ValueError:
+                raise ValueError(f"Invalid Unicode escape: \\u{hex_str}")
+
+        # Invalid escape sequence
+        raise ValueError(f"Unknown escape sequence: \\{ch}")
+
+    def _unescape_string(self, s):
+        """Handle backslash escape sequences in strings and quoted atoms."""
+        result = []
+        i = 0
+        while i < len(s):
+            if s[i] == '\\':
+                try:
+                    code, new_i = self._parse_escape_sequence(s, i)
+                    if code == 0 and s[i:i+2] == '\\c':
+                        # \c produces no output - skip it entirely
+                        i = new_i
+                        continue
+                    result.append(chr(code))
+                    i = new_i
+                except ValueError as e:
+                    # Invalid escape - syntax error
+                    raise PrologThrow(PrologError.syntax_error(f"invalid escape sequence: {e}", "string/1"))
+            else:
+                result.append(s[i])
+                i += 1
+        return ''.join(result)
 
     def atom(self, items):
         atom_str = str(items[0])
@@ -794,32 +883,11 @@ class PrologTransformer(Transformer):
 
             # Handle backslash escape sequences
             if char_part.startswith("\\"):
-                if char_part.startswith("\\x"):
-                    match = re.fullmatch(r"\\x([0-9a-fA-F]*)\\?", char_part)
-                    if not match:
-                        raise ValueError("unexpected_char")
-
-                    hex_digits = match.group(1)
-                    if len(hex_digits) < 2:
-                        raise ValueError("incomplete_reduction")
-
-                    try:
-                        return Number(int(hex_digits, 16))
-                    except ValueError as exc:
-                        raise ValueError("unexpected_char") from exc
-
-                if char_part == "\\\\":
-                    # Escaped backslash
-                    return Number(ord("\\"))
-                if char_part == "\\'":
-                    # Escaped single quote
-                    return Number(ord("'"))
-
-                if len(char_part) >= 2:
-                    # Other escape like \t, \n, etc - just use the second char
-                    return Number(ord(char_part[1]))
-
-                raise ValueError("unexpected_char")
+                try:
+                    code, _ = self._parse_escape_sequence(char_part, 0)
+                    return Number(code)
+                except ValueError as e:
+                    raise ValueError("unexpected_char")
 
             # Regular character
             if char_part:
