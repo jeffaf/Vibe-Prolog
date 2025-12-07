@@ -1,348 +1,596 @@
 # Vibe-Prolog Library Loading Status
 
-**Test Date:** 2025-12-05
-**Last Investigation:** 2025-12-05
+**Test Date:** 2025-12-06 18:10:56 UTC
 
-## Executive Summary
+## Summary
 
 - **Total Files:** 63
-- **Confirmed Working:** ~29
-- **Known Issues:** 34 (categorized below)
+- **Loaded Successfully:** 29
+- **Failed to Load:** 34
+- **Success Rate:** 29/63 (46%)
 
-The library loading failures fall into **four distinct root causes**:
+## Failure Type Breakdown
 
-1. **Parser Performance (Earley Parser Hangs)** - The most common issue
-2. **Circular Dependencies via library(lists)** - Many libraries depend on lists.pl which hangs
-3. **Syntax Errors** - Unicode characters, inline comments after `;`
-4. **Missing Features** - Nested module paths, DCG variable goals
+| Failure Type | Count | Representative Files | Notes |
+| --- | --- | --- | --- |
+| Timeout (30s limit hit) | 29 | `library/arithmetic.pl`, `library/builtins.pl`, `library/tabling.pl` | Likely waiting on unsupported predicates or cyclic `use_module/1` chains; affects most I/O, numeric, and tabling libraries. |
+| Prolog error (syntax) | 4 | `library/numerics/special_functions.pl`, `library/ordsets.pl` | Parser currently rejects Unicode atoms such as `δ_*` and specific layouts where block comments touch code, blocking numerics and data-structure libs. |
+| Parse error (unsupported DCG) | 1 | `library/serialization/json.pl` | DCG rule calls `NumberChars/4`, which Vibe-Prolog does not yet translate, preventing JSON support. |
 
----
+## Priority Recommendations
 
-## Root Cause Analysis
+1. **Unblock Unicode-heavy numerics modules.** Extend the tokenizer/parser so atoms like `δ_inverses_t/5` and `δ_successors_t/5` are accepted (ideally by treating all valid UTF-8 letters as atom constituents). This immediately enables both `library/numerics/special_functions.pl` and `library/numerics/testutils.pl` and removes an entire failure category.
+2. **Fix comment-adjacent syntax handling.** Files such as `library/ordsets.pl` and `library/ugraphs.pl` place `true` or operators directly after `/* ... */` comments; today that raises `No terminal matches 't'`. Adjust the lexer to automatically insert whitespace after closing block comments (or forbid comment/term concatenation during tokenization) so these widely used data structure libraries load.
+3. **Instrument 30s timeouts on foundational libs first.** Start with `library/builtins.pl`, `library/arithmetic.pl`, and `library/tabling.pl` because their failure cascades to many others. Add tracing around `consult/1` (e.g., predicate-level logging or a max-depth watchdog) to spot the missing predicate or infinite recursion that causes the stall before tackling lower-priority timeout files.
+4. **Implement the `NumberChars/4` DCG helper.** `library/serialization/json.pl` only fails because `NumberChars` is unimplemented. Adding this DCG primitive (or a compatibility wrapper) restores JSON parsing and is self-contained compared with the systemic timeout issues.
 
-### Issue #1: Earley Parser Performance Regression
+## Successfully Loaded Files ✅
 
-**Affected Files:** library/lists.pl (and ALL libraries that depend on it)
+- `library/$project_atts.pl`
+- `library/assoc.pl`
+- `library/atts.pl`
+- `library/between.pl`
+- `library/cont.pl`
+- `library/dcgs.pl`
+- `library/diag.pl`
+- `library/dif.pl`
+- `library/error.pl`
+- `library/freeze.pl`
+- `library/gensym.pl`
+- `library/http/http_open.pl`
+- `library/iso_ext.pl`
+- `library/lambda.pl`
+- `library/lists.pl`
+- `library/loader.pl`
+- `library/pairs.pl`
+- `library/queues.pl`
+- `library/random.pl`
+- `library/reif.pl`
+- `library/si.pl`
+- `library/sockets.pl`
+- `library/tabling/double_linked_list.pl`
+- `library/tabling/global_worklist.pl`
+- `library/tabling/wrapper.pl`
+- `library/terms.pl`
+- `library/test_module.pl`
+- `library/tls.pl`
+- `library/wasm.pl`
 
-**Symptom:** Parser hangs indefinitely when parsing certain Prolog files
+## Failed to Load Files ❌
 
-**Root Cause:** The Lark Earley parser is experiencing exponential time complexity on certain grammar patterns in the Prolog source. This was confirmed by testing incremental parsing of library/lists.pl:
-- Lines 0-110: Parses successfully (23 terms)
-- Lines 0-111+: Parser hangs
+### library/arithmetic.pl
 
-**Line 111 of lists.pl:**
-```prolog
-length_addendum([], N, N).
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
 ```
 
-This appears to trigger parser ambiguity issues, possibly related to:
-- The comma operator precedence
-- Variable-only clause bodies
-- Interaction with meta_predicate directives
 
-**Impact:** This is the **critical blocker** because lists.pl is imported by:
-- library/iso_ext.pl → library/dcgs.pl → library/freeze.pl → many others
-- library/error.pl
-- library/format.pl
-- library/clpz.pl
-- Most other Scryer-Prolog libraries
+### library/builtins.pl
 
-**Cascade Effect:**
+**Status:** ❌ Timeout
+
+**Details:**
+
 ```
-library/lists.pl [HANGS]
-  └── library/iso_ext.pl [HANGS - imports lists]
-        └── library/dcgs.pl [HANGS - imports iso_ext]
-              └── library/freeze.pl [HANGS - imports dcgs]
-                    └── library/pio.pl [HANGS - imports freeze]
-                          └── library/format.pl [HANGS - imports pio]
-                                └── library/debug.pl [HANGS - imports format]
-                                      └── library/clpz.pl [HANGS - imports debug]
+File loading exceeded 30 seconds
 ```
 
-**Recommended Fix:** 
-- Profile the Lark Earley parser to identify the ambiguity source
-- Consider switching to LALR parsing mode for better performance
-- May need grammar refactoring to reduce ambiguity
 
----
+### library/charsio.pl
 
-### Issue #2: Syntax Error - Inline Comments After Semicolon
+**Status:** ❌ Timeout
 
-**Affected Files:** library/ordsets.pl, library/ugraphs.pl
+**Details:**
 
-**Symptom:** 
 ```
-error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39
-        ;/* R2 = (=),   Item == X2 */ true
+File loading exceeded 30 seconds
 ```
 
-**Root Cause:** The parser doesn't correctly handle `/* ... */` block comments immediately following a `;` (disjunction operator).
 
-**Code Pattern:**
-```prolog
-;/* R2 = (=) */ true    % Parser fails here
+### library/clpb.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
 ```
 
-**Recommended Fix:** Update parser to allow block comments anywhere whitespace is permitted, including after operators.
 
----
+### library/clpz.pl
 
-### Issue #3: Syntax Error - Unicode Characters in Identifiers
+**Status:** ❌ Timeout
 
-**Affected Files:** library/numerics/testutils.pl
+**Details:**
 
-**Symptom:**
 ```
-error(syntax_error(No terminal matches 'δ' in the current parser context
+File loading exceeded 30 seconds
+```
+
+
+### library/crypto.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/csv.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/debug.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/ffi.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/files.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/format.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/http/http_server.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/numerics/quadtests.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/numerics/special_functions.pl
+
+**Status:** ❌ Prolog error
+
+**Details:**
+
+```
+PrologThrow: error(syntax_error(No terminal matches 'δ' in the current parser context, at line 11 col 16
+
               ,δ_inverses_t/5
+               ^
+Expected one of: 
+	* SPECIAL_ATOM
+	* OP_SYMBOL
+	* PREFIX_FY_900_45
+	* STRING
+	* CHAR_CODE
+	* NUMBER
+	* VARIABLE
+	* PREFIX_FX_700_44
+	* ARITH_OP_FUNCTOR
+	* INFIX_OP_FUNCTOR
+	* LBRACE
+	* INFIX_YFX_500_16
+	* PREFIX_FY_200_4
+	* PREFIX_FX_1150_50
+	* LPAR
+	* SPECIAL_ATOM_OPS
+	* PREFIX_FX_1200_53
+	* CONTROL_OP_FUNCTOR
+	* OPERATOR_ATOM
+	* PREFIX_FX_1200_54
+	* ATOM
+	* BANG
+	* LSQB
+	* PREFIX_FY_200_3
+	* COMPARISON_OP_FUNCTOR
+), context(consult/1))
 ```
 
-**Root Cause:** The lexer doesn't recognize Unicode Greek letters (δ, π, etc.) as valid atom characters.
 
-**Code Pattern:**
-```prolog
-:- module(testutils, [
-    δ_inverses_t/5  % Greek delta - fails to parse
-]).
+### library/numerics/testutils.pl
+
+**Status:** ❌ Prolog error
+
+**Details:**
+
+```
+PrologThrow: error(syntax_error(No terminal matches 'δ' in the current parser context, at line 11 col 16
+
+              ,δ_inverses_t/5
+               ^
+Expected one of: 
+	* SPECIAL_ATOM
+	* OP_SYMBOL
+	* PREFIX_FY_900_45
+	* STRING
+	* CHAR_CODE
+	* NUMBER
+	* VARIABLE
+	* PREFIX_FX_700_44
+	* ARITH_OP_FUNCTOR
+	* INFIX_OP_FUNCTOR
+	* LBRACE
+	* INFIX_YFX_500_16
+	* PREFIX_FY_200_4
+	* PREFIX_FX_1150_50
+	* LPAR
+	* SPECIAL_ATOM_OPS
+	* PREFIX_FX_1200_53
+	* CONTROL_OP_FUNCTOR
+	* OPERATOR_ATOM
+	* PREFIX_FX_1200_54
+	* ATOM
+	* BANG
+	* LSQB
+	* PREFIX_FY_200_3
+	* COMPARISON_OP_FUNCTOR
+), context(consult/1))
 ```
 
-**Recommended Fix:** Extend ATOM terminal regex to include Unicode letter categories (\p{L} or explicit Greek ranges).
 
----
+### library/ops_and_meta_predicates.pl
 
-### Issue #4: Missing Feature - Nested Module Paths
+**Status:** ❌ Timeout
 
-**Affected Files:** 
-- library/numerics/special_functions.pl
-- library/tabling.pl
-- library/tabling/batched_worklist.pl
-- library/tabling/table_data_structure.pl
-- library/tabling/table_link_manager.pl
+**Details:**
 
-**Symptom:**
 ```
-error(type_error(atom, /(tabling, double_linked_list)), context(use_module/1,2))
-error(type_error(atom, /(numerics, testutils)), context(use_module/1,2))
+File loading exceeded 30 seconds
 ```
 
-**Root Cause:** The `use_module/1` implementation doesn't support nested library paths like `library(tabling/double_linked_list)` or `library(numerics/testutils)`.
 
-**Code Pattern:**
-```prolog
-:- use_module(library(tabling/double_linked_list)).  % Fails
+### library/ordsets.pl
+
+**Status:** ❌ Prolog error
+
+**Details:**
+
+```
+PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39
+
+        ;/* R2 = (=),   Item == X2 */ true
+                                      ^
+Expected one of: 
+	* INFIX_YFX_400_6
+	* INFIX_XFY_1000_46
+	* INFIX_YFX_400_9
+	* INFIX_YFX_400_12
+	* INFIX_YFX_500_18
+	* INFIX_YFX_500_15
+	* INFIX_XFX_450_14
+	* INFIX_XFX_1200_50
+	* INFIX_YFX_500_17
+	* INFIX_XFY_200_1
+	* INFIX_XFY_200_2
+	* INFIX_YFX_500_16
+	* INFIX_YFX_400_8
+	* INFIX_XFX_1200_51
+	* INFIX_YFX_400_13
+	* INFIX_XFY_1100_48
+	* LPAR
+	* INFIX_XFY_600_19
+	* INFIX_XFY_1050_47
+	* INFIX_YFX_400_10
+	* INFIX_YFX_400_11
+	* INFIX_YFX_400_7
+	* RPAR
+	* INFIX_YFX_400_5
+), context(consult/1))
 ```
 
-**Recommended Fix:** Extend module path resolution to handle `/` as path separator in library terms.
 
----
+### library/os.pl
 
-### Issue #5: Missing Feature - DCG Variable Goals
+**Status:** ❌ Timeout
 
-**Affected Files:** library/serialization/json.pl
+**Details:**
 
-**Symptom:**
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/pio.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/process.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/serialization/abnf.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/serialization/json.pl
+
+**Status:** ❌ Parse error
+
+**Details:**
+
 ```
 ValueError: Unsupported DCG goal: NumberChars
 ```
 
-**Root Cause:** The DCG expander doesn't handle variable goals in DCG bodies.
 
-**Code Pattern (lines 207-208):**
-```prolog
-;   { number_chars(Number, NumberChars) },
-    NumberChars   % Variable used as DCG goal - fails
+### library/sgml.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
 ```
 
-**Recommended Fix:** Add support for DCG bodies where a variable is used directly as a terminal sequence goal.
 
----
+### library/simplex.pl
 
-### Issue #6: Permission Error - goal_expansion/2
+**Status:** ❌ Timeout
 
-**Affected Files:** library/clpz.pl
+**Details:**
 
-**Symptom:**
 ```
-error(permission_error(modify, static_procedure, /(goal_expansion, 2)))
+File loading exceeded 30 seconds
 ```
 
-**Root Cause:** clpz.pl attempts to define clauses for `goal_expansion/2`, but this is treated as a static built-in predicate.
 
-**Recommended Fix:** Either:
-- Make goal_expansion/2 dynamic/multifile by default
-- Or implement proper term expansion hooks
+### library/tabling.pl
 
----
+**Status:** ❌ Timeout
 
-## Files By Status
+**Details:**
 
-### ✅ Successfully Loading (29 files)
+```
+File loading exceeded 30 seconds
+```
 
-These files load without errors:
 
-| File | Notes |
-|------|-------|
-| library/$project_atts.pl | Residual goal projection |
-| library/assoc.pl | Association lists |
-| library/atts.pl | Attributed variables |
-| library/between.pl | Integer generation |
-| library/cont.pl | Delimited continuations |
-| library/diag.pl | Diagnostics |
-| library/dif.pl | Disequality constraint |
-| library/error.pl | Error handling |
-| library/gensym.pl | Symbol generation |
-| library/http/http_open.pl | HTTP client |
-| library/lambda.pl | Lambda expressions |
-| library/loader.pl | Module loader |
-| library/pairs.pl | Key-value pairs |
-| library/queues.pl | Queue operations |
-| library/random.pl | Random numbers |
-| library/reif.pl | Reified predicates |
-| library/si.pl | Safety infrastructure |
-| library/sockets.pl | Network sockets |
-| library/tabling/double_linked_list.pl | Tabling internals |
-| library/tabling/global_worklist.pl | Tabling internals |
-| library/tabling/wrapper.pl | Tabling internals |
-| library/terms.pl | Term utilities |
-| library/test_module.pl | Test module |
-| library/tls.pl | TLS support |
-| library/wasm.pl | WebAssembly |
+### library/tabling/batched_worklist.pl
 
-### ❌ Parser Hang - Depends on library/lists.pl (26 files)
+**Status:** ❌ Timeout
 
-These files hang because they directly or transitively import library/lists.pl:
+**Details:**
 
-| File | Import Chain |
-|------|--------------|
-| library/lists.pl | **ROOT CAUSE** - Parser hangs at line 111 |
-| library/iso_ext.pl | imports lists |
-| library/dcgs.pl | imports iso_ext |
-| library/freeze.pl | imports dcgs |
-| library/pio.pl | imports freeze, gensym |
-| library/format.pl | imports pio, charsio |
-| library/debug.pl | imports format |
-| library/charsio.pl | imports dcgs, iso_ext, lists |
-| library/clpz.pl | imports debug, format + goal_expansion issue |
-| library/clpb.pl | imports lists, format |
-| library/crypto.pl | imports clpz |
-| library/arithmetic.pl | imports lists |
-| library/builtins.pl | imports lists, format |
-| library/csv.pl | imports dcgs |
-| library/ffi.pl | imports dcgs, lists |
-| library/files.pl | imports dcgs, lists |
-| library/ops_and_meta_predicates.pl | imports lists |
-| library/os.pl | imports lists |
-| library/process.pl | imports dcgs |
-| library/sgml.pl | imports dcgs |
-| library/simplex.pl | imports lists |
-| library/time.pl | imports lists |
-| library/uuid.pl | imports lists |
-| library/when.pl | imports dcgs |
-| library/xpath.pl | imports lists, dcgs |
-| library/serialization/abnf.pl | imports dcgs |
+```
+File loading exceeded 30 seconds
+```
 
-### ❌ Syntax Errors (2 files)
 
-| File | Issue |
-|------|-------|
-| library/ordsets.pl | Inline comments after `;` |
-| library/ugraphs.pl | Inline comments after `;` (imports ordsets) |
+### library/tabling/table_data_structure.pl
 
-### ❌ Unicode Support (1 file)
+**Status:** ❌ Timeout
 
-| File | Issue |
-|------|-------|
-| library/numerics/testutils.pl | Greek letter δ in identifiers |
+**Details:**
 
-### ❌ Nested Module Paths (5 files)
+```
+File loading exceeded 30 seconds
+```
 
-| File | Issue |
-|------|-------|
-| library/numerics/special_functions.pl | `library(numerics/testutils)` |
-| library/tabling.pl | `library(tabling/double_linked_list)` |
-| library/tabling/batched_worklist.pl | `library(tabling/global_worklist)` |
-| library/tabling/table_data_structure.pl | `library(tabling/table_link_manager)` |
-| library/tabling/table_link_manager.pl | `library(tabling/trie)` |
 
-### ❌ DCG Variable Goals (1 file)
+### library/tabling/table_link_manager.pl
 
-| File | Issue |
-|------|-------|
-| library/serialization/json.pl | Variable `NumberChars` used as DCG goal |
+**Status:** ❌ Timeout
 
-### ❌ Timeout - Unknown (2 files)
+**Details:**
 
-| File | Issue |
-|------|-------|
-| library/numerics/quadtests.pl | Needs investigation |
-| library/tabling/trie.pl | Needs investigation |
+```
+File loading exceeded 30 seconds
+```
 
-### ❌ HTTP Server (1 file)
 
-| File | Issue |
-|------|-------|
-| library/http/http_server.pl | Timeout - likely dependency issue |
+### library/tabling/trie.pl
 
----
+**Status:** ❌ Timeout
 
-## Priority for Fixes
+**Details:**
 
-### High Priority (Unblocks Many Libraries)
+```
+File loading exceeded 30 seconds
+```
 
-1. **Fix Earley parser performance on library/lists.pl**
-   - This single fix would unblock 26+ libraries
-   - Critical for Scryer-Prolog compatibility
-   
-2. **Support nested library paths in use_module/1**
-   - Quick fix to module resolution
-   - Unblocks 5 files
 
-### Medium Priority
+### library/time.pl
 
-3. **Fix inline comments after `;` operator**
-   - Parser grammar fix
-   - Unblocks ordsets.pl, ugraphs.pl
+**Status:** ❌ Timeout
 
-4. **Support Unicode in atom identifiers**
-   - Lexer extension
-   - Unblocks numerics library
+**Details:**
 
-### Lower Priority
+```
+File loading exceeded 30 seconds
+```
 
-5. **DCG variable goal support**
-   - DCG expander enhancement
-   - Affects json.pl
 
-6. **goal_expansion/2 handling**
-   - Meta-predicate system
-   - Affects clpz.pl
+### library/ugraphs.pl
 
----
+**Status:** ❌ Prolog error
 
-## Recommended GitHub Issues
+**Details:**
 
-Based on this analysis, the following issues should be created:
+```
+PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39
 
-1. **Parser: Earley parser hangs on library/lists.pl** (Critical)
-   - Labels: bug, parser, performance
-   - Blocks: 26+ library files
-   
-2. **Module: Support nested library paths (library(a/b))** 
-   - Labels: enhancement, module-system
-   - Blocks: 5 files
+        ;/* R2 = (=),   Item == X2 */ true
+                                      ^
+Expected one of: 
+	* INFIX_YFX_400_6
+	* INFIX_XFY_1000_46
+	* INFIX_YFX_400_9
+	* INFIX_YFX_400_12
+	* INFIX_YFX_500_18
+	* INFIX_YFX_500_15
+	* INFIX_XFX_450_14
+	* INFIX_XFX_1200_50
+	* INFIX_YFX_500_17
+	* INFIX_XFY_200_1
+	* INFIX_XFY_200_2
+	* INFIX_YFX_500_16
+	* INFIX_YFX_400_8
+	* INFIX_XFX_1200_51
+	* INFIX_YFX_400_13
+	* INFIX_XFY_1100_48
+	* LPAR
+	* INFIX_XFY_600_19
+	* INFIX_XFY_1050_47
+	* INFIX_YFX_400_10
+	* INFIX_YFX_400_11
+	* INFIX_YFX_400_7
+	* RPAR
+	* INFIX_YFX_400_5
+), context(consult/1))
+```
 
-3. **Parser: Support block comments after semicolon operator**
-   - Labels: bug, parser
-   - Blocks: ordsets.pl, ugraphs.pl
 
-4. **Parser: Support Unicode letters in atom identifiers**
-   - Labels: enhancement, parser, iso-compliance
-   - Blocks: numerics library
+### library/uuid.pl
 
-5. **DCG: Support variable goals in DCG bodies**
-   - Labels: enhancement, dcg
-   - Blocks: json.pl
+**Status:** ❌ Timeout
 
-6. **Meta: Implement goal_expansion/2 hook**
-   - Labels: enhancement, meta-predicates
-   - Affects: clpz.pl optimization
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/when.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/xpath.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+## Failures
+
+### Timeout (29 files)
+
+- **library/arithmetic.pl** - ❌ Timeout
+- **library/builtins.pl** - ❌ Timeout
+- **library/charsio.pl** - ❌ Timeout
+- **library/clpb.pl** - ❌ Timeout
+- **library/clpz.pl** - ❌ Timeout
+- **library/crypto.pl** - ❌ Timeout
+- **library/csv.pl** - ❌ Timeout
+- **library/debug.pl** - ❌ Timeout
+- **library/ffi.pl** - ❌ Timeout
+- **library/files.pl** - ❌ Timeout
+- **library/format.pl** - ❌ Timeout
+- **library/http/http_server.pl** - ❌ Timeout
+- **library/numerics/quadtests.pl** - ❌ Timeout
+- **library/ops_and_meta_predicates.pl** - ❌ Timeout
+- **library/os.pl** - ❌ Timeout
+- **library/pio.pl** - ❌ Timeout
+- **library/process.pl** - ❌ Timeout
+- **library/serialization/abnf.pl** - ❌ Timeout
+- **library/sgml.pl** - ❌ Timeout
+- **library/simplex.pl** - ❌ Timeout
+- **library/tabling.pl** - ❌ Timeout
+- **library/tabling/batched_worklist.pl** - ❌ Timeout
+- **library/tabling/table_data_structure.pl** - ❌ Timeout
+- **library/tabling/table_link_manager.pl** - ❌ Timeout
+- **library/tabling/trie.pl** - ❌ Timeout
+- **library/time.pl** - ❌ Timeout
+- **library/uuid.pl** - ❌ Timeout
+- **library/when.pl** - ❌ Timeout
+- **library/xpath.pl** - ❌ Timeout
+
+### Prolog Errors (4 files)
+
+- **library/numerics/special_functions.pl** - ❌ Prolog error
+- **library/numerics/testutils.pl** - ❌ Prolog error
+- **library/ordsets.pl** - ❌ Prolog error
+- **library/ugraphs.pl** - ❌ Prolog error
+
+### Parse Errors (1 file)
+
+- **library/serialization/json.pl** - ❌ Parse error

@@ -139,6 +139,11 @@ uv run pytest -v
 uv run pytest -s
 ```
 
+### Long-running tests
+
+- When adding a new test that consistently takes longer than ~4 seconds, mark it with `@pytest.mark.performance` (or set `pytestmark = pytest.mark.performance` for whole classes/files) so it only runs when `--run-performance` is used.
+- Document why the test is performance-marked in its docstring when the reason is not obvious.
+
 
 ## Development Workflow
 
