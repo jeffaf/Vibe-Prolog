@@ -202,6 +202,14 @@ class TestEscapeSequences:
         with pytest.raises(Exception):
             prolog.query_once("X = \"\\uGGGG\".")
 
+        # Trailing characters in char code literal
+        with pytest.raises(Exception):
+            prolog.query_once("X = 0'\\na'.")
+
+        # \c is invalid in a char code literal
+        with pytest.raises(Exception):
+            prolog.query_once("X = 0'\\c'.")
+
     def test_conformity_test_cases(self):
         """Test the specific cases from the conformity tests that were failing."""
         prolog = PrologInterpreter()

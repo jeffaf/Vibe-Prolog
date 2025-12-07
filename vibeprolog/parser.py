@@ -616,10 +616,8 @@ class PrologTransformer(Transformer):
     def _parse_escape_sequence(self, s, pos):
         """Parse a single escape sequence starting at pos in string s.
 
-        Returns (char_code, new_pos) where char_code is the Unicode code point,
-        and new_pos is the position after the escape sequence.
-
-        Raises ValueError for invalid escape sequences.
+        Returns (char, new_pos) where char is the resulting character, or
+        raises ValueError on invalid escape sequences.
         """
         if pos >= len(s) or s[pos] != '\\':
             raise ValueError("Not an escape sequence")
@@ -632,101 +630,73 @@ class PrologTransformer(Transformer):
         ch = s[pos]
         pos += 1
 
-        # Single character escapes
-        single_char_escapes = {
-            'a': 7,   # alert (bell)
-            'b': 8,   # backspace
-            'c': None,  # no output (used in writeq)
-            'd': 127, # delete
-            'e': 27,  # escape
-            'f': 12,  # form feed
-            'n': 10,  # newline
-            'r': 13,  # carriage return
-            's': 32,  # space
-            't': 9,   # tab
-            'v': 11,  # vertical tab
-            "'": ord("'"),  # escaped single quote
-            '"': ord('"'),  # escaped double quote
-            '\\': ord('\\'), # escaped backslash
-        }
-
-        if ch in single_char_escapes:
-            code = single_char_escapes[ch]
-            if code is None:  # \c - no output
-                return 0, pos  # Return null character for no output
-            return code, pos
-
-        # Octal escape: \ followed by 1-3 octal digits
-        if ch in '01234567':
-            # Collect up to 3 octal digits
-            octal_str = ch
-            for i in range(2):
-                if pos < len(s) and s[pos] in '01234567':
-                    octal_str += s[pos]
+        # Octal escapes: up to 3 octal digits (0-7) following backslash
+        if ch in "01234567":
+            digits = ch
+            # collect up to 2 more octal digits
+            for _ in range(2):
+                if pos < len(s) and s[pos] in "01234567":
+                    digits += s[pos]
                     pos += 1
                 else:
                     break
-            try:
-                return int(octal_str, 8), pos
-            except ValueError:
-                raise ValueError(f"Invalid octal escape: \\{octal_str}")
+            code = int(digits, 8)
+            return chr(code), pos
 
-        # Hex escape: \x followed by hex digits, optionally ended by \
+        # Hex escapes: \x followed by one or more hex digits
         if ch == 'x':
-            hex_str = ""
+            if pos >= len(s) or not (s[pos].isdigit() or 'a' <= s[pos].lower() <= 'f'):
+                raise ValueError("Invalid hex escape")
+            digits = ''
             while pos < len(s):
-                if s[pos] in '0123456789abcdefABCDEF':
-                    hex_str += s[pos]
+                if s[pos].isdigit() or 'a' <= s[pos].lower() <= 'f':
+                    digits += s[pos]
                     pos += 1
                 elif s[pos] == '\\':
                     pos += 1  # Skip the closing backslash
                     break
                 else:
                     break
-            if not hex_str:
-                raise ValueError("Hex escape sequence missing digits")
-            try:
-                return int(hex_str, 16), pos
-            except ValueError:
-                raise ValueError(f"Invalid hex escape: \\x{hex_str}")
+            code = int(digits, 16)
+            return chr(code), pos
 
-        # Unicode escape: \u followed by exactly 4 hex digits
+        # Unicode escapes: \uXXXX (exactly 4 hex digits)
         if ch == 'u':
             if pos + 4 > len(s):
-                raise ValueError("Unicode escape sequence too short")
-            hex_str = s[pos:pos+4]
+                raise ValueError("Incomplete Unicode escape")
+            digits = s[pos:pos+4]
+            if not all(c in "0123456789abcdefABCDEF" for c in digits):
+                raise ValueError("Invalid Unicode escape")
+            code = int(digits, 16)
             pos += 4
-            if not all(c in '0123456789abcdefABCDEF' for c in hex_str):
-                raise ValueError(f"Invalid Unicode escape: \\u{hex_str}")
-            try:
-                return int(hex_str, 16), pos
-            except ValueError:
-                raise ValueError(f"Invalid Unicode escape: \\u{hex_str}")
+            return chr(code), pos
 
-        # Invalid escape sequence
-        raise ValueError(f"Unknown escape sequence: \\{ch}")
+        # Single-character escapes
+        single_char_escapes = {
+            'a': 7, 'b': 8, 'd': 127, 'e': 27, 'f': 12,
+            'n': 10, 'r': 13, 's': 32, 't': 9, 'v': 11,
+            "'": ord("'"), '"': ord('"'), '\\': ord('\\'),
+        }
+        if ch in single_char_escapes:
+            code = single_char_escapes[ch]
+            return chr(code), pos
+        if ch == 'c':
+            # \c is not valid in string escapes or char literals in this implementation
+            raise ValueError("Invalid escape: \\c")
+        raise ValueError(f"Unknown escape: \\{ch}")
 
     def _unescape_string(self, s):
-        """Handle backslash escape sequences in strings and quoted atoms."""
-        result = []
+        """Unescape a string literal, handling backslash escapes."""
+        res = []
         i = 0
         while i < len(s):
             if s[i] == '\\':
-                try:
-                    code, new_i = self._parse_escape_sequence(s, i)
-                    if code == 0 and s[i:i+2] == '\\c':
-                        # \c produces no output - skip it entirely
-                        i = new_i
-                        continue
-                    result.append(chr(code))
-                    i = new_i
-                except ValueError as e:
-                    # Invalid escape - syntax error
-                    raise PrologThrow(PrologError.syntax_error(f"invalid escape sequence: {e}", "string/1"))
+                ch, i = self._parse_escape_sequence(s, i)
+                res.append(ch)
             else:
-                result.append(s[i])
+                res.append(s[i])
                 i += 1
-        return ''.join(result)
+        return ''.join(res)
 
     def atom(self, items):
         atom_str = str(items[0])
