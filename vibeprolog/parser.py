@@ -1469,15 +1469,30 @@ def _format_operator_literals(ops: Iterable[str]) -> str:
 
 
 def _operator_token_priority(name: str) -> int:
-    """Choose a token priority that beats the generic OP_SYMBOL lexer rule.
+    r"""Choose a token priority that favors the most specific punctuation ops.
 
-    OP_SYMBOL has priority 25 and eagerly matches runs of operator punctuation,
-    which would swallow custom operators like +++ or ***, preventing the
-    operator-specific tokens from ever being seen by the parser. By giving
-    punctuation-heavy operators a priority above 25 we ensure the generated
-    operator tokens win when they are valid in the current parse context.
+    Without a longest-match preference the lexer can split ``++`` into two ``+``
+    tokens (or ``=\=`` into ``=`` followed by ``\=``) whenever doing so still
+    yields a valid parse. That breaks precedence accounting for dynamic
+    operators. We therefore boost the priority of non-alphanumeric operators so
+    the lexer consumes the full operator before letting shorter prefixes try to
+    match. Alphabetic operator names (``mod``, ``in``) should continue to lex as
+    regular atoms so they participate in predicate indicators like ``dynamic
+    foo/1`` without being split apart.
     """
-    return 2
+
+    if any(ch.isalnum() or ch == "_" for ch in name):
+        return 0
+
+    if len(name) == 1:
+        return 0
+
+    if name in {":-", "-->", "?-"}:
+        return 0
+
+    # Punctuation-only operators should outrank OP_SYMBOL (priority 25) and use
+    # longest match to beat their own prefixes.
+    return 30 + len(name)
 
 
 def _merge_operators(
