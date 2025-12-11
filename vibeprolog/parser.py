@@ -106,8 +106,11 @@ class PredicatePropertyDirective:
     indicators: tuple[PredicateIndicator, ...]
 
 
+# Centralized Unicode letter ranges for atoms
+UNICODE_LETTER_RANGES = r"\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF"
+
 # Lark grammar for Prolog
-PROLOG_GRAMMAR = r"""
+PROLOG_GRAMMAR_TEMPLATE = r"""
     _DOT: "."
     _LPAR: "("
     _RPAR: ")"
@@ -239,9 +242,9 @@ __OPERATOR_GRAMMAR__
     // Unicode letters include: Latin Extended (00C0-017F), Greek (0370-03FF), Cyrillic (0400-04FF),
     // Arabic (0600-06FF), Devanagari (0900-097F), CJK Unified (4E00-9FFF), Hiragana (3040-309F),
     // Hangul (AC00-D7AF), and other scripts. Priority 6 ensures it matches before number operators.
-    ATOM.6: /[a-z_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF][a-z0-9_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF]*/
+    ATOM.6: /[a-z_{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}]* */
         | /\{\}/
-        | /\$[a-z_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF][a-z0-9_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF-]*/
+        | /\$[a-z_{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}-]* */
         | /[+\-*\/]/
 
     // VARIABLE: unquoted variables must start with uppercase ASCII letter or underscore,
@@ -281,7 +284,29 @@ class PrologTransformer(Transformer):
 
     @v_args(meta=True)
     def directive(self, meta, items):
-        return Directive(goal=items[0], meta=meta)
+        goal = items[0]
+        # Don't wrap PredicatePropertyDirective in Directive
+        if isinstance(goal, PredicatePropertyDirective):
+            return goal
+        
+        # Convert Compound goals like dynamic(X), multifile(X), discontiguous(X)
+        # to PredicatePropertyDirective if they aren't wrapped in parentheses
+        if isinstance(goal, Compound) and goal.functor in ("dynamic", "multifile", "discontiguous"):
+            if len(goal.args) == 1:
+                arg = goal.args[0]
+                # Handle both single indicator and comma-separated list
+                if isinstance(arg, Compound) and arg.functor == "/":
+                    # Single indicator like dynamic(p/1)
+                    indicators = [arg]
+                elif isinstance(arg, ParenthesizedComma):
+                    # Comma-separated like dynamic((p/1, q/2))
+                    indicators = self._flatten_comma_separated(arg)
+                else:
+                    # Try to flatten in case it's a comma expression
+                    indicators = self._flatten_comma_separated(arg)
+                return PredicatePropertyDirective(goal.functor, tuple(indicators))
+        
+        return Directive(goal=goal, meta=meta)
 
     def predicate_indicators(self, items):
         return items
@@ -1758,7 +1783,7 @@ class PrologParser:
 
     def _build_grammar(self, operators: list[tuple[int, str, str]]) -> str:
         operator_rules = generate_operator_rules(operators)
-        return PROLOG_GRAMMAR.replace("__OPERATOR_GRAMMAR__", operator_rules)
+        return PROLOG_GRAMMAR_TEMPLATE.replace("{UNICODE_LETTER_RANGES}", UNICODE_LETTER_RANGES).replace("__OPERATOR_GRAMMAR__", operator_rules)
 
     def _ensure_parser(
         self,
@@ -2040,6 +2065,10 @@ class PrologParser:
             if term.body is not None:
                 body = [self._fold_numeric_unary_minus(goal) for goal in term.body]
             return Clause(head, body, term.doc, term.meta, term.dcg)
+
+        # PredicatePropertyDirective doesn't have numeric minus to fold, return as-is
+        if isinstance(term, PredicatePropertyDirective):
+            return term
 
         if isinstance(term, Directive):
             goal = self._fold_numeric_unary_minus(term.goal)

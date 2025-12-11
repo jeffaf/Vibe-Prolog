@@ -9,33 +9,13 @@ from vibeprolog import PrologInterpreter
 from vibeprolog.terms import Atom, Compound, Number
 
 
-class TestUnicodeAtomParsing:
-    """Basic Unicode atom parsing tests."""
-
-    def test_greek_delta_atom(self):
-        """Test parsing Greek letter δ as an unquoted atom."""
-        prolog = PrologInterpreter()
-        result = prolog.query_once("X = δ")
-        assert result is not None
-        assert result['X'] == Atom('δ')
-
-    def test_greek_alpha_atom(self):
-        """Test parsing Greek letter α as an unquoted atom."""
-        prolog = PrologInterpreter()
-        result = prolog.query_once("X = α")
-        assert result is not None
-        assert result['X'] == Atom('α')
-
-    def test_greek_beta_gamma_atoms(self):
-        """Test parsing other Greek letters β and γ."""
-        prolog = PrologInterpreter()
-        result = prolog.query_once("X = β")
-        assert result is not None
-        assert result['X'] == Atom('β')
-        
-        result = prolog.query_once("X = γ")
-        assert result is not None
-        assert result['X'] == Atom('γ')
+@pytest.mark.parametrize("char", ["δ", "α", "β", "γ"])
+def test_greek_letter_atoms(char):
+    """Test parsing various Greek letters as unquoted atoms."""
+    prolog = PrologInterpreter()
+    result = prolog.query_once(f"X = {char}")
+    assert result is not None
+    assert result['X'] == char
 
     def test_unicode_atom_with_underscore(self):
         """Test Unicode letter followed by underscore."""
@@ -49,11 +29,11 @@ class TestUnicodeAtomParsing:
         prolog = PrologInterpreter()
         result = prolog.query_once("X = δ1")
         assert result is not None
-        assert result['X'] == Atom('δ1')
-        
+        assert result['X'] == 'δ1'
+
         result = prolog.query_once("X = α_v2")
         assert result is not None
-        assert result['X'] == Atom('α_v2')
+        assert result['X'] == 'α_v2'
 
     def test_mixed_ascii_unicode_atom(self):
         """Test ASCII letters mixed with Unicode letters."""
@@ -246,7 +226,7 @@ class TestUnicodeAtomProcessing:
         prolog = PrologInterpreter()
         result = prolog.query_once("atom_concat(δ, _test, X)")
         assert result is not None
-        assert result['X'] == Atom('δ_test')
+        assert result['X'] == 'δ_test'
 
     def test_atom_concat_unicode_decompose(self):
         """Test atom_concat/3 decomposing Unicode atoms."""
