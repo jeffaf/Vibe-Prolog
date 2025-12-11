@@ -703,3 +703,24 @@ class TestModuleQualifiedPredicateDirectives:
         
         result2 = prolog.query_once("test:local_pred(X)")
         assert result2 is not None and result2["X"] == "local_value"
+
+    def test_module_qualified_discontiguous_error_without_directive(self):
+        """Non-contiguous module-qualified predicates without discontiguous should raise error.
+
+        This test verifies that the closed_predicates mechanism works correctly with
+        module-qualified predicates. Without the :- discontiguous directive, adding
+        clauses for the same predicate after an intervening clause should raise a
+        permission_error.
+        """
+        prolog = PrologInterpreter()
+
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("""
+                :- module(test, []).
+                user:test_pred(a, 1).
+                foo(bar). % Intervening clause
+                user:test_pred(b, 2).  % Should fail - discontiguous not declared
+            """)
+
+        # Should get a permission_error for modifying a static procedure
+        assert "permission_error" in str(excinfo.value.term)

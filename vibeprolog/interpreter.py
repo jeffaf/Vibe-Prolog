@@ -270,19 +270,19 @@ class PrologInterpreter:
         self,
         items: list,
         source_name: str,
-        closed_predicates: set[tuple[str, int]] | None = None,
-        last_predicate: tuple[str, int] | None = None,
-    ) -> tuple[str, int] | None:
+        closed_predicates: set[tuple[str, str, int]] | None = None,
+        last_predicate: tuple[str, str, int] | None = None,
+    ) -> tuple[str, str, int] | None:
         """Process parsed clauses and directives.
         
         Args:
             items: List of parsed clauses and directives
             source_name: Name of the source being consulted
-            closed_predicates: Set of predicates that have been "closed"
-            last_predicate: The last predicate key that was added
-            
+            closed_predicates: Set of predicates that have been "closed" as (module, functor, arity)
+            last_predicate: The last predicate key that was added as (module, functor, arity)
+
         Returns:
-            The last predicate key processed
+            The last predicate key processed as (module, functor, arity)
         """
         self._ensure_builtin_properties()
         if closed_predicates is None:
@@ -346,7 +346,7 @@ class PrologInterpreter:
         return last_predicate
 
     def _handle_directive(
-        self, directive: Directive, closed_predicates: set[tuple[str, int]], source_name=None
+        self, directive: Directive, closed_predicates: set[tuple[str, str, int]], source_name=None
     ):
         """Handle a directive."""
         goal = directive.goal
@@ -1255,7 +1255,7 @@ class PrologInterpreter:
         return result
 
     def _handle_predicate_property_directive(
-        self, directive: PredicatePropertyDirective, closed_predicates: set[tuple[str, int]]
+        self, directive: PredicatePropertyDirective, closed_predicates: set[tuple[str, str, int]]
     ) -> None:
         """Apply a predicate property directive."""
 
@@ -1480,14 +1480,23 @@ class PrologInterpreter:
         self,
         clause: Clause,
         source_name: str,
-        closed_predicates: set[tuple[str, int]],
-        last_predicate: tuple[str, int] | None,
-    ) -> tuple[str, int] | None:
+        closed_predicates: set[tuple[str, str, int]],
+        last_predicate: tuple[str, str, int] | None,
+    ) -> tuple[str, str, int] | None:
         """Insert a clause while enforcing predicate properties.
 
         Supports module-qualified clause heads like `Module:Head :- Body`.
         When the head is a `:/2` compound, the clause is added to the
         specified module rather than the current module.
+
+        Args:
+            clause: The clause to add
+            source_name: Source identifier for tracking
+            closed_predicates: Set of (module, functor, arity) predicates that are closed
+            last_predicate: Previous predicate key as (module, functor, arity)
+
+        Returns:
+            The qualified predicate key as (module, functor, arity) or None
         """
 
         head = clause.head
@@ -1578,8 +1587,11 @@ class PrologInterpreter:
             )
             raise PrologThrow(error_term)
 
+        # Create qualified key for closed_predicates tracking
+        qualified_key = (module_name, key[0], key[1])
+
         if (
-            key in closed_predicates
+            qualified_key in closed_predicates
             and "discontiguous" not in properties
         ):
             indicator = self._indicator_from_key(key)
@@ -1588,8 +1600,11 @@ class PrologInterpreter:
             )
             raise PrologThrow(error_term)
 
-        if last_predicate is not None and last_predicate != key:
-            last_properties = self._get_module_predicate_properties(module_name, last_predicate)
+        if last_predicate is not None and last_predicate != qualified_key:
+            # Extract module and key from last_predicate (module, functor, arity)
+            last_module, last_functor, last_arity = last_predicate
+            last_key = (last_functor, last_arity)
+            last_properties = self._get_module_predicate_properties(last_module, last_key)
             if not last_properties:
                 last_properties = {"static"}
             if "discontiguous" not in last_properties:
@@ -1597,14 +1612,14 @@ class PrologInterpreter:
 
         self.clauses.append(clause)
         self._add_module_predicate_source(module_name, key, source_name)
-        
+
         # Also update global tracking for backward compatibility
         self.predicate_properties.setdefault(key, set()).update(properties)
         self._predicate_sources.setdefault(key, set()).add(source_name)
 
         mod.predicates.setdefault(key, []).append(clause)
 
-        return key
+        return qualified_key
 
     def _execute_initialization_goals(self):
         """Execute collected initialization goals."""
@@ -1649,8 +1664,9 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
         
         # Keep closed_predicates across chunks to enforce discontiguous requirements
-        closed_predicates: set[tuple[str, int]] = set()
-        last_predicate: tuple[str, int] | None = None
+        # Keys are (module, functor, arity) for module-aware tracking
+        closed_predicates: set[tuple[str, str, int]] = set()
+        last_predicate: tuple[str, str, int] | None = None
         
         for chunk in chunks:
             chunk = chunk.strip()
