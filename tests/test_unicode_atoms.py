@@ -103,11 +103,11 @@ class TestUnicodePredicateNames:
         """Test defining and calling a predicate with Unicode name."""
         prolog = PrologInterpreter()
         prolog.consult_string("δ_test(a). δ_test(b).")
-        
+
         results = list(prolog.query("δ_test(X)"))
         assert len(results) == 2
-        assert results[0]['X'] == Atom('a')
-        assert results[1]['X'] == Atom('b')
+        assert results[0]['X'] == 'a'
+        assert results[1]['X'] == 'b'
 
     def test_unicode_functor_with_args(self):
         """Test calling Unicode functor with arguments."""
@@ -122,9 +122,10 @@ class TestUnicodePredicateNames:
         prolog = PrologInterpreter()
         result = prolog.query_once("X = δ(1, 2, 3)")
         assert result is not None
-        assert isinstance(result['X'], Compound)
-        assert result['X'].functor == 'δ'
-        assert result['X'].args == (Number(1), Number(2), Number(3))
+        # query_once returns Python-native types: compounds become dicts
+        assert isinstance(result['X'], dict)
+        assert 'δ' in result['X']
+        assert result['X']['δ'] == [1, 2, 3]
 
 
 class TestUnicodeFunctor:
@@ -135,25 +136,27 @@ class TestUnicodeFunctor:
         prolog = PrologInterpreter()
         result = prolog.query_once("functor(δ_inverses_t(a, b, c, d, e), Name, Arity)")
         assert result is not None
-        assert result['Name'] == Atom('δ_inverses_t')
-        assert result['Arity'] == Number(5)
+        assert result['Name'] == 'δ_inverses_t'
+        assert result['Arity'] == 5
 
     def test_functor_construct_unicode(self):
         """Test functor/3 constructing compound with Unicode functor."""
         prolog = PrologInterpreter()
         result = prolog.query_once("functor(X, δ_test, 2)")
         assert result is not None
-        assert isinstance(result['X'], Compound)
-        assert result['X'].functor == 'δ_test'
-        assert len(result['X'].args) == 2
+        # functor/3 constructs a compound with fresh variables as args
+        # query_once returns compounds as dicts
+        assert isinstance(result['X'], dict)
+        assert 'δ_test' in result['X']
+        assert len(result['X']['δ_test']) == 2
 
     def test_functor_unicode_atom(self):
         """Test functor/3 with Unicode atom."""
         prolog = PrologInterpreter()
         result = prolog.query_once("functor(δ, F, A)")
         assert result is not None
-        assert result['F'] == Atom('δ')
-        assert result['A'] == Number(0)
+        assert result['F'] == 'δ'
+        assert result['A'] == 0
 
 
 class TestUnicodeUniv:
@@ -165,16 +168,20 @@ class TestUnicodeUniv:
         result = prolog.query_once("δ_test(a, b, c) =.. L")
         assert result is not None
         L = result['L']
-        assert isinstance(L, list) or (hasattr(L, 'elements') and L.elements[0] == Atom('δ_test'))
+        # query_once returns lists as Python lists
+        assert isinstance(L, list)
+        assert L[0] == 'δ_test'
+        assert L[1:] == ['a', 'b', 'c']
 
     def test_univ_construct_unicode(self):
         """Test constructing compound with Unicode functor using =.."""
         prolog = PrologInterpreter()
         result = prolog.query_once("X =.. [δ_test, a, b, c]")
         assert result is not None
-        assert isinstance(result['X'], Compound)
-        assert result['X'].functor == 'δ_test'
-        assert len(result['X'].args) == 3
+        # query_once returns compounds as dicts
+        assert isinstance(result['X'], dict)
+        assert 'δ_test' in result['X']
+        assert result['X']['δ_test'] == ['a', 'b', 'c']
 
 
 class TestUnicodeAtomProcessing:
@@ -187,10 +194,10 @@ class TestUnicodeAtomProcessing:
         assert result is not None
         # L should be a list containing the single character δ
         L = result['L']
-        # Check that it's a list with one element 'δ'
-        if hasattr(L, 'elements'):
-            assert len(L.elements) == 1
-            assert L.elements[0] == Atom('δ')
+        # query_once returns lists as Python lists
+        assert isinstance(L, list)
+        assert len(L) == 1
+        assert L[0] == 'δ'
 
     def test_atom_chars_unicode_compound(self):
         """Test atom_chars/2 with compound Unicode atom."""
@@ -198,9 +205,11 @@ class TestUnicodeAtomProcessing:
         result = prolog.query_once("atom_chars(δ_test, L)")
         assert result is not None
         L = result['L']
-        if hasattr(L, 'elements'):
-            # Should have characters: δ, _, t, e, s, t
-            assert len(L.elements) == 6
+        # query_once returns lists as Python lists
+        assert isinstance(L, list)
+        # Should have characters: δ, _, t, e, s, t
+        assert len(L) == 6
+        assert L == ['δ', '_', 't', 'e', 's', 't']
 
     def test_atom_codes_unicode(self):
         """Test atom_codes/2 with Unicode atoms."""
@@ -209,9 +218,9 @@ class TestUnicodeAtomProcessing:
         assert result is not None
         L = result['L']
         # δ (Greek small letter delta) is U+03B4
-        if hasattr(L, 'elements'):
-            assert len(L.elements) == 1
-            assert L.elements[0] == Number(0x03B4)  # 948 in decimal
+        assert isinstance(L, list)
+        assert len(L) == 1
+        assert L[0] == 0x03B4  # 948 in decimal
 
     def test_atom_length_unicode(self):
         """Test atom_length/2 with Unicode atoms."""
@@ -219,12 +228,13 @@ class TestUnicodeAtomProcessing:
         result = prolog.query_once("atom_length(δ_test, L)")
         assert result is not None
         # δ_test should be 6 characters long
-        assert result['L'] == Number(6)
+        assert result['L'] == 6
 
     def test_atom_concat_unicode(self):
         """Test atom_concat/3 with Unicode atoms."""
         prolog = PrologInterpreter()
-        result = prolog.query_once("atom_concat(δ, _test, X)")
+        # Use quoted '_test' since _test would be parsed as a variable
+        result = prolog.query_once("atom_concat(δ, '_test', X)")
         assert result is not None
         assert result['X'] == 'δ_test'
 
@@ -233,21 +243,21 @@ class TestUnicodeAtomProcessing:
         prolog = PrologInterpreter()
         results = list(prolog.query("atom_concat(δ, X, δ_test)"))
         assert len(results) > 0
-        assert results[0]['X'] == Atom('_test')
+        assert results[0]['X'] == '_test'
 
     def test_sub_atom_unicode(self):
         """Test sub_atom/5 with Unicode atoms."""
         prolog = PrologInterpreter()
         result = prolog.query_once("sub_atom(δ_test, 0, 1, _, S)")
         assert result is not None
-        assert result['S'] == Atom('δ')
+        assert result['S'] == 'δ'
 
     def test_sub_atom_unicode_middle(self):
         """Test sub_atom/5 extracting middle of Unicode atom."""
         prolog = PrologInterpreter()
         result = prolog.query_once("sub_atom(δ_test, 1, 1, _, S)")
         assert result is not None
-        assert result['S'] == Atom('_')
+        assert result['S'] == '_'
 
 
 class TestUnicodeInClauses:
@@ -260,7 +270,7 @@ class TestUnicodeInClauses:
             parent(δ, γ).
             parent(γ, β).
         """)
-        
+
         result = prolog.query_once("parent(δ, γ)")
         assert result is not None
 
@@ -268,10 +278,12 @@ class TestUnicodeInClauses:
         """Test Unicode atoms in rule bodies."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
+            :- multifile(parent/2).
             parent(δ, γ).
             grandparent(X, Z) :- parent(X, Y), parent(Y, Z).
         """)
-        
+
+        # Add more clauses to the multifile predicate
         prolog.consult_string("parent(γ, β).")
         result = prolog.query_once("grandparent(δ, β)")
         assert result is not None
@@ -280,21 +292,22 @@ class TestUnicodeInClauses:
         """Test binding variables with Unicode atoms."""
         prolog = PrologInterpreter()
         prolog.consult_string("parent(δ, γ). parent(γ, β).")
-        
+
         result = prolog.query_once("parent(δ, X), parent(X, β)")
         assert result is not None
-        assert result['X'] == Atom('γ')
+        assert result['X'] == 'γ'
 
 
 class TestUnicodeEdgeCases:
     """Test edge cases and special scenarios."""
 
-    def test_underscore_start_unicode(self):
-        """Test that underscore-prefixed Unicode atoms work."""
+    def test_quoted_underscore_unicode_atom(self):
+        """Test that quoted underscore-prefixed Unicode atoms work."""
         prolog = PrologInterpreter()
-        result = prolog.query_once("X = _δ")
+        # In Prolog, _δ is a variable, not an atom. Use quoted form for atom.
+        result = prolog.query_once("X = '_δ'")
         assert result is not None
-        assert result['X'] == Atom('_δ')
+        assert result['X'] == '_δ'
 
     def test_unicode_atom_unification(self):
         """Test unification of Unicode atoms."""
@@ -314,24 +327,26 @@ class TestUnicodeEdgeCases:
         result = prolog.query_once("X = [δ, γ, β]")
         assert result is not None
         L = result['X']
-        if hasattr(L, 'elements'):
-            assert L.elements[0] == Atom('δ')
-            assert L.elements[1] == Atom('γ')
-            assert L.elements[2] == Atom('β')
+        # query_once returns lists as Python lists
+        assert isinstance(L, list)
+        assert L[0] == 'δ'
+        assert L[1] == 'γ'
+        assert L[2] == 'β'
 
     def test_unicode_in_nested_compound(self):
         """Test Unicode atoms in nested compound terms."""
         prolog = PrologInterpreter()
         result = prolog.query_once("X = f(g(δ, γ), β)")
         assert result is not None
-        assert isinstance(result['X'], Compound)
-        assert result['X'].functor == 'f'
+        # query_once returns compounds as dicts
+        assert isinstance(result['X'], dict)
+        assert 'f' in result['X']
 
     def test_current_predicate_unicode(self):
         """Test current_predicate/1 with Unicode predicates."""
         prolog = PrologInterpreter()
         prolog.consult_string("δ_test(a). δ_test(b).")
-        
+
         result = prolog.query_once("current_predicate(δ_test/1)")
         assert result is not None
 
@@ -378,7 +393,8 @@ class TestUnicodeAndASCII:
         prolog = PrologInterpreter()
         result = prolog.query_once("X = test")
         assert result is not None
-        assert result['X'] == Atom('test')
+        # query_once returns atoms as Python strings
+        assert result['X'] == 'test'
 
     def test_mixed_unicode_ascii_unification(self):
         """Test that Unicode and ASCII atoms don't unify incorrectly."""
@@ -396,6 +412,6 @@ class TestUnicodeAndASCII:
             greek(δ).
             greek(γ).
         """)
-        
+
         result = prolog.query_once("color(red), greek(δ)")
         assert result is not None

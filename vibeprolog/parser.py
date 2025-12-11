@@ -1494,12 +1494,22 @@ def escape_for_lark(s: str) -> str:
 VALID_OPERATOR_SPECS = {"xfx", "xfy", "yfx", "yfy", "fx", "fy", "xf", "yf"}
 
 
+def _is_alphabetic_operator(name: str) -> bool:
+    """Check if an operator name is purely alphabetic (like 'in', 'mod', 'is')."""
+    return name.isalpha() or (name.replace("_", "").isalnum() and name[0].isalpha())
+
+
 def _format_operator_literals(ops: Iterable[str]) -> str:
     # Sort longest operators first so sequences like "\\+" take precedence over
     # shorter prefixes such as "\\".
     formatted: list[str] = []
     for op in sorted(set(ops), key=lambda value: (-len(value), value)):
-        formatted.append(f'"{escape_for_lark(op)}"')
+        if _is_alphabetic_operator(op):
+            # Alphabetic operators need word boundaries to prevent matching
+            # inside atoms like 'indexed' matching 'in' + 'dexed'
+            formatted.append(f'/(?<![a-zA-Z0-9_]){escape_for_lark(op)}(?![a-zA-Z0-9_])/')
+        else:
+            formatted.append(f'"{escape_for_lark(op)}"')
     return " | ".join(formatted)
 
 
