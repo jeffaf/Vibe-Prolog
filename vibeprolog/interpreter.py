@@ -1260,10 +1260,22 @@ class PrologInterpreter:
         """Apply a predicate property directive."""
 
         context = f"{directive.property}/1"
-        module_name = self.current_module
         
         for indicator in directive.indicators:
-            key = self._validate_predicate_indicator(indicator, context)
+            # Parse module-qualified indicator
+            target_module_name, bare_indicator = self._parse_module_qualified_indicator(indicator, context)
+            
+            # If no module specified, use current module
+            if target_module_name is None:
+                target_module_name = self.current_module
+            
+            # Validate the bare indicator
+            key = self._validate_predicate_indicator(bare_indicator, context)
+            
+            # Ensure the target module exists
+            if target_module_name not in self.modules:
+                # Create the module if it doesn't exist
+                self._ensure_module_exists(target_module_name)
             
             # Check global properties for built-in check
             global_properties = self.predicate_properties.get(key, set())
@@ -1274,8 +1286,8 @@ class PrologInterpreter:
                 )
                 raise PrologThrow(error_term)
 
-            # Get or create module-scoped properties
-            properties = self._get_module_predicate_properties(module_name, key).copy()
+            # Get or create module-scoped properties for the target module
+            properties = self._get_module_predicate_properties(target_module_name, key).copy()
 
             if directive.property == "dynamic":
                 properties.discard("static")
@@ -1285,14 +1297,55 @@ class PrologInterpreter:
                 if "dynamic" not in properties:
                     properties.add("static")
 
-            # Update module-scoped properties
-            self._set_module_predicate_properties(module_name, key, properties)
+            # Update module-scoped properties for the target module
+            self._set_module_predicate_properties(target_module_name, key, properties)
             
             # Also update global for backward compatibility
             self.predicate_properties.setdefault(key, set()).update(properties)
 
-            if directive.property == "discontiguous" and key in closed_predicates:
-                closed_predicates.discard(key)
+            # For discontiguous directives, remove from closed_predicates using the qualified key
+            if directive.property == "discontiguous":
+                # Create the qualified key for closed_predicates
+                qualified_key = (target_module_name, key[0], key[1])
+                if qualified_key in closed_predicates:
+                    closed_predicates.discard(qualified_key)
+
+    def _ensure_module_exists(self, module_name: str) -> None:
+        """Ensure that a module exists, creating it if necessary."""
+        if module_name not in self.modules:
+            # Create a basic module with no exports
+            self.modules[module_name] = Module(module_name, None)
+
+    def _parse_module_qualified_indicator(
+        self, indicator: Any, context: str
+    ) -> tuple[str | None, Any]:
+        """Parse a potentially module-qualified predicate indicator.
+        
+        Returns a tuple of (module_name, bare_indicator) where:
+        - module_name is None if no module qualifier is present
+        - bare_indicator is the Name/Arity indicator without module qualification
+        """
+        # Check if this is a module-qualified indicator: :(Module, Indicator)
+        if (
+            isinstance(indicator, Compound)
+            and indicator.functor == ":"
+            and len(indicator.args) == 2
+        ):
+            module_term, bare_indicator = indicator.args
+            
+            # Validate that module is an atom
+            if isinstance(module_term, Variable):
+                error_term = PrologError.instantiation_error(context)
+                raise PrologThrow(error_term)
+            
+            if not isinstance(module_term, Atom):
+                error_term = PrologError.type_error("atom", module_term, context)
+                raise PrologThrow(error_term)
+            
+            return module_term.name, bare_indicator
+        else:
+            # No module qualification
+            return None, indicator
 
     def _validate_predicate_indicator(
         self, indicator: PredicateIndicator | Any, context: str
