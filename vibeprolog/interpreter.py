@@ -115,6 +115,9 @@ class PrologInterpreter:
         # - has_seen_else: True if we have seen an else clause (to prevent multiple else)
         # - any_branch_taken: True if any if/elif branch has been taken (for else logic)
         self._conditional_stack: list[tuple[bool, bool, bool]] = []
+        
+        # Initialize hook predicates in the user module
+        self._initialize_hook_predicates()
 
     @property
     def argv(self) -> list[str]:
@@ -253,6 +256,125 @@ class PrologInterpreter:
             # Expose interpreter to engine for module introspection
             eng.interpreter = self
             self._builtins_seeded = True
+
+    def _initialize_hook_predicates(self) -> None:
+        """Initialize standard hook predicates in the user module.
+        
+        Hook predicates like goal_expansion/2 and term_expansion/2 are multifile
+        by convention, allowing multiple libraries to add clauses to them.
+        """
+        # List of standard hook predicates that should be multifile
+        hook_predicates = [
+            ("goal_expansion", 2),
+            ("term_expansion", 2),
+            ("message_hook", 3),
+            ("exception", 3),
+        ]
+        
+        # Set these predicates as multifile in the user module
+        for functor, arity in hook_predicates:
+            key = (functor, arity)
+            # Set the multifile property for the user module
+            properties = {"multifile", "dynamic"}  # multifile implies dynamic
+            self._set_module_predicate_properties("user", key, properties)
+            # Also update global properties for backward compatibility
+            self.predicate_properties[key] = properties
+
+    def _call_term_expansion(self, term) -> Any:
+        """Call term_expansion/2 hook on a term.
+        
+        Note: term_expansion/2 may non-standardly expand a term into a list.
+        This function currently uses the first successful expansion and returns
+        that, or the original term if there is no expansion.
+        
+        Args:
+            term: The term to expand
+            
+        Returns:
+            The expanded term, or the original term if no expansion occurred
+        """
+        # Ensure we have an engine for term expansion
+        if self.engine is None:
+            # Create the engine if it doesn't exist
+            self.engine = PrologEngine(
+                self.clauses,
+                self.argv,
+                self.predicate_properties,
+                self._predicate_sources,
+                self.predicate_docs,
+                operator_table=self.operator_table,
+                max_depth=self.max_recursion_depth,
+                tabled_predicates=self._tabled_predicates,
+            )
+            self.engine.interpreter = self
+        
+        # Try to call term_expansion/2
+        try:
+            # Look for term_expansion/2 clauses in all modules, starting with user
+            solutions_iter = self.engine._solve_goals([
+                Compound("term_expansion", [term, Variable("Expanded")])
+            ], Substitution())
+            
+            first_solution = next(solutions_iter, None)
+            if first_solution is not None:
+                # Return the first successful expansion
+                expanded_term = first_solution.bindings.get("Expanded")
+                if expanded_term is not None:
+                    return expanded_term
+            # No expansion occurred
+            return term
+        except Exception as e:
+            # If term expansion fails for any reason, warn and return the original term
+            try:
+                warnings.warn(f"Term expansion failed for term '{term}': {e}")
+            except Exception:
+                pass
+            return term
+
+    def _apply_term_expansion(self, item) -> Any:
+        """Apply term expansion to a parsed item (clause or directive).
+        
+        Args:
+            item: The parsed item (Clause or Directive)
+            
+        Returns:
+            The expanded item, or the original item if no expansion occurred
+        """
+        # For now, we'll implement a basic version that handles the most common cases
+        # A full implementation would need to handle more complex scenarios
+        
+        # If the item is a clause, we might want to expand its head
+        if isinstance(item, Clause):
+            # Try to expand the clause head
+            expanded_head = self._call_term_expansion(item.head)
+            if expanded_head != item.head and isinstance(expanded_head, (Atom, Compound)):
+                # Create a new clause with the expanded head
+                return Clause(
+                    head=expanded_head,
+                    body=item.body,
+                    doc=item.doc,
+                    meta=item.meta,
+                    dcg=item.dcg
+                )
+            
+            # If head wasn't expanded, try to expand the entire clause as a term
+            # This is a simplified approach - real term expansion is more complex
+            expanded_term = self._call_term_expansion(item)
+            if expanded_term != item:
+                return expanded_term
+            
+            return item
+            
+        elif isinstance(item, Directive):
+            # For directives, we might want to expand the goal
+            expanded_goal = self._call_term_expansion(item.goal)
+            if expanded_goal != item.goal:
+                return Directive(goal=expanded_goal, doc=item.doc)
+            return item
+            
+        else:
+            # For other item types, try to expand them directly
+            return self._call_term_expansion(item)
 
     def _flatten_comma_compound(self, compound):
         """Flatten a comma compound into a list of terms.
@@ -1723,10 +1845,21 @@ class PrologInterpreter:
             except (ValueError, LarkError) as exc:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")
                 raise PrologThrow(error_term)
-            # Process each item immediately so char_conversion directives
+            # Apply term expansion to each item
+            # Note: term_expansion/2 may non-standardly expand to a list.
+            # If an expansion yields a list, extend the results; otherwise append.
+            expanded_items = []
+            for item in items:
+                expanded_item = self._apply_term_expansion(item)
+                if hasattr(expanded_item, "elements") and isinstance(expanded_item.elements, list):
+                    expanded_items.extend(expanded_item.elements)
+                else:
+                    expanded_items.append(expanded_item)
+            
+            # Process each expanded item immediately so char_conversion directives
             # take effect before subsequent parsing
-            last_predicate = self._process_items(items, source_name, closed_predicates, last_predicate)
-            all_items.extend(items)
+            last_predicate = self._process_items(expanded_items, source_name, closed_predicates, last_predicate)
+            all_items.extend(expanded_items)
 
         # Check for unclosed conditional directives
         if self._conditional_stack:
