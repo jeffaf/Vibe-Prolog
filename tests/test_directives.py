@@ -64,13 +64,14 @@ class TestPredicateDirectives:
             ":- dynamic(dyn/1).\n:- multifile(dyn/1).\n:- discontiguous(dyn/1).\ndyn(1)."
         )
 
-        assert prolog.has_solution("predicate_property(dyn/1, dynamic(dyn/1))")
-        assert prolog.has_solution("predicate_property(dyn/1, multifile(dyn/1))")
-        assert prolog.has_solution("predicate_property(dyn/1, discontiguous(dyn/1))")
-        assert not prolog.has_solution("predicate_property(dyn/1, static(dyn/1))")
+        # ISO Prolog requires predicate_property to return simple atoms
+        assert prolog.has_solution("predicate_property(dyn/1, dynamic)")
+        assert prolog.has_solution("predicate_property(dyn/1, multifile)")
+        assert prolog.has_solution("predicate_property(dyn/1, discontiguous)")
+        assert not prolog.has_solution("predicate_property(dyn/1, static)")
 
         prolog.consult_string("static_p(1).")
-        assert prolog.has_solution("predicate_property(static_p/1, static(static_p/1))")
+        assert prolog.has_solution("predicate_property(static_p/1, static)")
 
         built_in_props = prolog.query("predicate_property(member(_, _), Prop)")
         assert any(row["Prop"] == "built_in" for row in built_in_props)

@@ -100,13 +100,13 @@ class ReflectionBuiltins:
         if "built_in" in properties:
             property_terms.append(Atom("built_in"))
         if "dynamic" in properties:
-            property_terms.append(Compound("dynamic", (indicator_term,)))
+            property_terms.append(Atom("dynamic"))
         if "multifile" in properties:
-            property_terms.append(Compound("multifile", (indicator_term,)))
+            property_terms.append(Atom("multifile"))
         if "discontiguous" in properties:
-            property_terms.append(Compound("discontiguous", (indicator_term,)))
+            property_terms.append(Atom("discontiguous"))
         if "static" in properties:
-            property_terms.append(Compound("static", (indicator_term,)))
+            property_terms.append(Atom("static"))
 
         for term in property_terms:
             result = unify(property_term, term, subst)

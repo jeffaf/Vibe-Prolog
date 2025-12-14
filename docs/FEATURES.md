@@ -367,8 +367,8 @@ The following Scryer-Prolog specific directives are recognized but ignored (with
 | Predicate                             | Status | Notes                   |
 | ------------------------------------- | ------ | ----------------------- |
 | `current_predicate/1`                 | ✅      | Module-qualified indicators (`module:Name/Arity`) supported |
-| `predicate_property/2`                | ⚠️     | Built-in detection only |
-| `dynamic/static/multifile` properties | ❌      | Needed for ISO tooling  |
+| `predicate_property/2`                | ✅      | Returns ISO-compliant atom properties (built_in, static, dynamic, multifile, discontiguous) |
+| `dynamic/static/multifile` properties | ✅      | Full property support via predicate_property/2 |
 
 ---
 
@@ -481,7 +481,7 @@ Basic variant tabling is available via the `:- table` directive.
 | Errors & exceptions       | ✅ Strong                                                   |
 | Parsing & syntax          | ✅ Strong - op/3 ✅, custom operator syntax parsing ✅, ISO operators ✅, prefix `:-` ✅, char_conversion ✅ |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
-| Reflection                | ⚠️ Partial                                                 |
+| Reflection                | ✅ Strong - predicate_property/2 with ISO-compliant atom properties |
 
 ---
 
