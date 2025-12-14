@@ -179,5 +179,5 @@ class TestPredicatePropertyEdgeCases:
         """Cut should be recognized as built-in."""
         prolog = PrologInterpreter()
         result = prolog.query_once("predicate_property(!/0, P)")
-        # Cut might not be in builtin registry with explicit entry
-        # This tests the indicator format at minimum
+        assert result is not None
+        assert result["P"] == "built_in"
